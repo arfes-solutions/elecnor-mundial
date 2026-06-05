@@ -883,3 +883,201 @@ def ver_prediccion(participant_id):
 @public_bp.route("/health")
 def health():
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# ADMIN
+# ---------------------------------------------------------------------------
+ADMIN_TEMPLATE = """<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin – Porra Mundial 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;850;900&display=swap" rel="stylesheet">
+""" + _BASE_STYLE + """
+<style>
+  .admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:28px;}
+  .group-card{border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+  .group-card-header{background:var(--pitch);color:#fff;padding:9px 14px;font-weight:850;}
+  .group-card-body{padding:12px;display:grid;gap:8px;}
+  select,input[type=text]{min-height:40px;font-size:.88rem;}
+  .section-title{font-size:1.1rem;font-weight:850;color:var(--pitch-dark);margin:24px 0 12px;
+    padding-bottom:8px;border-bottom:2px solid var(--line);}
+  .teams-check{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .chk{display:none;}
+  .lbl{padding:7px 12px;border:2px solid var(--line);border-radius:7px;cursor:pointer;
+    font-weight:750;font-size:.85rem;background:#fff;}
+  .chk:checked+.lbl{border-color:var(--pitch);background:#e6f5ee;color:var(--pitch-dark);}
+  .save-bar{position:sticky;bottom:0;background:#fff;border-top:2px solid var(--line);
+    padding:14px 20px;display:flex;gap:12px;align-items:center;}
+  .msg{padding:10px 16px;border-radius:8px;font-weight:750;}
+  .msg-ok{background:#d4edda;color:#0f5132;}
+  .msg-err{background:#fde8e4;color:#8b2215;}
+  .login-box{max-width:380px;margin:60px auto;padding:32px;border:1px solid var(--line);border-radius:12px;
+    background:#fff;box-shadow:0 20px 56px rgba(7,63,43,.1);}
+  .login-box h2{margin:0 0 20px;color:var(--pitch-dark);}
+</style>
+</head><body>
+{{ topbar | safe }}
+<main class="shell">
+
+{% if not authed %}
+<div class="login-box">
+  <h2>Acceso Admin</h2>
+  {% if error %}<p class="msg msg-err">{{ error }}</p>{% endif %}
+  <form method="post">
+    <input type="hidden" name="action" value="login">
+    <label>Contraseña de administrador</label>
+    <input type="password" name="admin_password" style="margin:8px 0 16px" required>
+    <button class="btn btn-primary" type="submit" style="width:100%">Entrar</button>
+  </form>
+</div>
+
+{% else %}
+
+<section class="card">
+  <div class="section-header"><h2>Panel de Administrador</h2></div>
+  <div class="body-pad">
+    {% if msg %}<p class="msg {{ 'msg-ok' if ok else 'msg-err' }}">{{ msg }}</p><br>{% endif %}
+
+    <form method="post">
+      <input type="hidden" name="action" value="save_results">
+
+      <p class="section-title">Fase de Grupos — Clasificados por grupo</p>
+      <div class="admin-grid">
+        {% for letra, team_ids in groups.items() %}
+        <div class="group-card">
+          <div class="group-card-header">Grupo {{ letra }}</div>
+          <div class="group-card-body">
+            {% for pos, label in [('1','1º'), ('2','2º'), ('3','Mejor 3º')] %}
+            <select name="g_{{ letra }}_{{ pos }}">
+              <option value="">{{ label }} — sin resultado</option>
+              {% for tid in team_ids %}
+              {% set tname = teams[tid].name %}
+              <option value="{{ tname }}" {{ 'selected' if results.get('g_' ~ letra.lower() ~ '_' ~ pos) == tname }}>
+                {{ label }} · {{ tname }}
+              </option>
+              {% endfor %}
+            </select>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <p class="section-title">Eliminatorias</p>
+
+      {% set all_teams = teams.values()|map(attribute='name')|sort|list %}
+
+      {% for ronda, label, maxsel in [
+          ('octavos','Octavos de Final (16)',16),
+          ('cuartos','Cuartos de Final (8)',8),
+          ('semis','Semifinales (4)',4),
+          ('final','Final (2)',2)] %}
+      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">{{ label }}</p>
+      <div class="teams-check">
+        {% for tname in all_teams %}
+        <span>
+          <input type="checkbox" name="{{ ronda }}" value="{{ tname }}"
+                 id="r_{{ ronda }}_{{ loop.index }}" class="chk"
+                 {{ 'checked' if tname in (results.get(ronda) or []) }}>
+          <label class="lbl" for="r_{{ ronda }}_{{ loop.index }}">{{ tname }}</label>
+        </span>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">Campeón</p>
+      <select name="campeon" style="max-width:300px;margin-bottom:14px;">
+        <option value="">— sin resultado —</option>
+        {% for tname in all_teams %}
+        <option value="{{ tname }}" {{ 'selected' if results.get('campeon') == tname }}>{{ tname }}</option>
+        {% endfor %}
+      </select>
+
+      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">Subcampeón</p>
+      <select name="subcampeon" style="max-width:300px;margin-bottom:14px;">
+        <option value="">— sin resultado —</option>
+        {% for tname in all_teams %}
+        <option value="{{ tname }}" {{ 'selected' if results.get('subcampeon') == tname }}>{{ tname }}</option>
+        {% endfor %}
+      </select>
+
+      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">Pichichi (máximo goleador)</p>
+      <input type="text" name="pichichi" value="{{ results.get('pichichi',[''])[0] if results.get('pichichi') else '' }}"
+             placeholder="Ej: Kylian Mbappé" style="max-width:300px;margin-bottom:20px;">
+
+      <div class="save-bar">
+        <button class="btn btn-primary" type="submit">💾 Guardar resultados</button>
+        <span style="color:var(--muted);font-size:.88rem;">Los puntos del ranking se actualizan al guardar.</span>
+      </div>
+    </form>
+  </div>
+</section>
+{% endif %}
+
+</main></body></html>
+"""
+
+
+@public_bp.route("/admin", methods=["GET", "POST"])
+def admin():
+    from flask import current_app
+    admin_password = current_app.config.get("ADMIN_PASSWORD", "")
+    authed = session.get("admin_authed", False)
+    msg, ok, error = None, False, None
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "login":
+            pwd = request.form.get("admin_password", "")
+            if admin_password and pwd == admin_password:
+                session["admin_authed"] = True
+                authed = True
+            else:
+                error = "Contraseña incorrecta."
+
+        elif action == "save_results" and authed:
+            try:
+                storage = get_storage()
+                results = {}
+                for letra in "ABCDEFGHIJKL":
+                    for pos in ("1", "2", "3"):
+                        val = request.form.get(f"g_{letra}_{pos}", "").strip()
+                        if val:
+                            results[f"g_{letra.lower()}_{pos}"] = val
+                for ronda in ("octavos", "cuartos", "semis", "final"):
+                    vals = request.form.getlist(ronda)
+                    if vals:
+                        results[ronda] = vals
+                campeon = request.form.get("campeon", "").strip()
+                if campeon:
+                    results["campeon"] = campeon
+                subcampeon = request.form.get("subcampeon", "").strip()
+                if subcampeon:
+                    results["subcampeon"] = subcampeon
+                pichichi = request.form.get("pichichi", "").strip()
+                if pichichi:
+                    results["pichichi"] = [pichichi.lower()]
+                storage.save_results(results)
+                msg, ok = "Resultados guardados correctamente.", True
+            except Exception as exc:
+                msg, ok = f"Error al guardar: {exc}", False
+
+    current_results = {}
+    if authed:
+        try:
+            current_results = get_storage().load_results()
+        except Exception:
+            pass
+
+    return render_template_string(
+        ADMIN_TEMPLATE,
+        topbar=_topbar(show_logout=_logged_in()),
+        authed=authed,
+        groups=GROUPS,
+        teams=TEAMS,
+        results=current_results,
+        msg=msg,
+        ok=ok,
+        error=error,
+    )
