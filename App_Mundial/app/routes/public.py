@@ -988,20 +988,18 @@ def eliminatorias_fase():
 @public_bp.route("/admin", methods=["GET", "POST"])
 def admin():
     from flask import current_app
-    from app.services.sync import fetch_results
 
-    admin_password = current_app.config.get("ADMIN_PASSWORD", "")
-    authed = session.get("admin_authed", False)
+    # Admin is accessible to anyone logged in with Elecnor/Mundial26
+    authed = session.get("authenticated", False)
+    if not authed:
+        return redirect(url_for("public.welcome"))
+
     msg, ok, error = None, False, None
 
     if request.method == "POST":
         action = request.form.get("action")
-        if action == "login":
-            if admin_password and request.form.get("admin_password") == admin_password:
-                session["admin_authed"] = True
-                authed = True
-            else:
-                error = "Contraseña incorrecta."
+        if False:  # placeholder to keep elif chain
+            pass
 
         elif action == "sync_api" and authed:
             api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
@@ -1196,7 +1194,7 @@ def admin():
 """
     return render_template_string(
         ADMIN_HTML,
-        authed=authed, grupos=grupos_fmt, all_teams=all_teams,
+        authed=True, grupos=grupos_fmt, all_teams=all_teams,
         results=current_results, msg=msg, ok=ok, error=error,
         has_api_key=has_api_key,
     )
