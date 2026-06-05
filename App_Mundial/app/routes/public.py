@@ -817,8 +817,8 @@ def _auto_sync():
         last_sync_str = storage.get_setting("last_sync", "")
         if last_sync_str:
             elapsed = (now_utc - datetime.datetime.fromisoformat(last_sync_str)).total_seconds()
-            if elapsed < 60:
-                return  # Already synced less than 1 minute ago
+            if elapsed < 15:
+                return  # Already synced less than 15 seconds ago
         from app.services.sync import fetch_all
         data = fetch_all(api_key)
         new_results = data.get("results", {})
