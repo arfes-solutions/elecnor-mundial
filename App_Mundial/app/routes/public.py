@@ -83,9 +83,6 @@ HTML_TEMPLATE = """
             <div class="d-flex gap-2">
                 <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
                 <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
-                {% if authenticated %}
-                <a href="{{ url_for('public.logout') }}" class="btn btn-outline-light fw-bold px-3">Salir</a>
-                {% endif %}
             </div>
         </div>
     </div>
