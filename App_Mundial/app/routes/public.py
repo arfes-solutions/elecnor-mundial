@@ -153,7 +153,7 @@ HTML_TEMPLATE = """
                 </button>
             </div>
             <!-- MOBILE: menú desplegable -->
-            <div class="collapse" id="mobileMenu" style="display:none;">
+            <div class="collapse" id="mobileMenu">
                 <div class="d-flex flex-column gap-2 pt-2">
                     {% if live_matches %}{% set m = live_matches[0] %}
                     <div class="nav-match-pill live mx-auto">
