@@ -1,43 +1,51 @@
+import requests
 from flask import current_app
 
 
-def get_client():
-    try:
-        from supabase import create_client
-    except ImportError as exc:
-        raise RuntimeError("Supabase storage requires the 'supabase' package.") from exc
+def _headers():
+    key = current_app.config.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    return {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
 
-    url = current_app.config.get("SUPABASE_URL")
-    key = current_app.config.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not url or not key:
-        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.")
 
-    return create_client(url, key)
+def _url(path):
+    base = current_app.config.get("SUPABASE_URL", "").rstrip("/")
+    return f"{base}/rest/v1/{path}"
+
+
+def _check(response):
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase error {response.status_code}: {response.text}")
+    return response
 
 
 def load_participants():
-    response = (
-        get_client()
-        .table("participants")
-        .select("name,prediction_json")
-        .order("created_at")
-        .execute()
-    )
-    return {row["name"]: row.get("prediction_json") or {} for row in response.data}
+    r = _check(requests.get(
+        _url("participants"),
+        headers=_headers(),
+        params={"select": "name,prediction_json", "order": "created_at"},
+    ))
+    return {row["name"]: row.get("prediction_json") or {} for row in r.json()}
 
 
 def get_participant_by_email(email):
-    response = (
-        get_client()
-        .table("participants")
-        .select("id,name,email,password_hash,prediction_json")
-        .ilike("email", email.strip())
-        .limit(1)
-        .execute()
-    )
-    if not response.data:
+    r = _check(requests.get(
+        _url("participants"),
+        headers=_headers(),
+        params={
+            "select": "id,name,email,password_hash,prediction_json",
+            "email": f"ilike.{email.strip()}",
+            "limit": "1",
+        },
+    ))
+    data = r.json()
+    if not data:
         return None
-    row = response.data[0]
+    row = data[0]
     return {
         "id": row["id"],
         "name": row["name"],
@@ -47,66 +55,58 @@ def get_participant_by_email(email):
     }
 
 
+def create_participant(name, email, password_hash):
+    _check(requests.post(
+        _url("participants"),
+        headers=_headers(),
+        json={
+            "name": name.strip(),
+            "email": email.strip().lower(),
+            "password_hash": password_hash,
+            "prediction_json": {"grupos": {}, "eliminatorias": {}},
+        },
+    ))
+
+
 def save_participant(name, prediction, email=None, password_hash=None):
     payload = {"name": name.strip(), "prediction_json": prediction}
     if email:
         payload["email"] = email.strip().lower()
     if password_hash:
         payload["password_hash"] = password_hash
-    get_client().table("participants").upsert(
-        payload,
-        on_conflict="name",
-    ).execute()
-
-
-def create_participant(name, email, password_hash):
-    get_client().table("participants").insert(
-        {
-            "name": name.strip(),
-            "email": email.strip().lower(),
-            "password_hash": password_hash,
-            "prediction_json": {"grupos": {}, "eliminatorias": {}},
-        }
-    ).execute()
+    h = {**_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
+    _check(requests.post(_url("participants"), headers=h, json=payload))
 
 
 def load_results():
-    response = (
-        get_client()
-        .table("results")
-        .select("results_json")
-        .eq("id", 1)
-        .limit(1)
-        .execute()
-    )
-    if not response.data:
+    r = _check(requests.get(
+        _url("results"),
+        headers=_headers(),
+        params={"select": "results_json", "id": "eq.1", "limit": "1"},
+    ))
+    data = r.json()
+    if not data:
         return {}
-    return response.data[0].get("results_json") or {}
+    return data[0].get("results_json") or {}
 
 
 def save_results(results):
-    get_client().table("results").upsert(
-        {"id": 1, "results_json": results},
-        on_conflict="id",
-    ).execute()
+    h = {**_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
+    _check(requests.post(_url("results"), headers=h, json={"id": 1, "results_json": results}))
 
 
 def get_setting(key, default=None):
-    response = (
-        get_client()
-        .table("settings")
-        .select("value")
-        .eq("key", key)
-        .limit(1)
-        .execute()
-    )
-    if not response.data:
+    r = _check(requests.get(
+        _url("settings"),
+        headers=_headers(),
+        params={"select": "value", "key": f"eq.{key}", "limit": "1"},
+    ))
+    data = r.json()
+    if not data:
         return default
-    return response.data[0]["value"]
+    return data[0]["value"]
 
 
 def set_setting(key, value):
-    get_client().table("settings").upsert(
-        {"key": key, "value": value},
-        on_conflict="key",
-    ).execute()
+    h = {**_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
+    _check(requests.post(_url("settings"), headers=h, json={"key": key, "value": value}))
