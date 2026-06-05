@@ -1038,7 +1038,7 @@ def _auto_sync():
 
 
 def _render_ranking():
-    _auto_sync()
+    # Load data FIRST, then sync in background so reads are never blocked by writes
     try:
         storage = get_storage()
         participants = storage.load_participants()
@@ -1046,6 +1046,7 @@ def _render_ranking():
         fixtures = storage.load_fixtures()
     except Exception:
         participants, results, fixtures = {}, {}, []
+    _auto_sync()  # sync after reading so it doesn't race with our data load
 
     standings = build_standings(participants, results)
     try:
