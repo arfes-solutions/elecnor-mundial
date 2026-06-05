@@ -393,6 +393,8 @@ RANKING_TEMPLATE = """
 
 @public_bp.route("/")
 def welcome():
+    if session.get("participant_name"):
+        return redirect(url_for("public.ranking"))
     return render_template_string(WELCOME_TEMPLATE)
 
 
@@ -403,7 +405,14 @@ def login():
     if not email or not password:
         return render_template_string(WELCOME_TEMPLATE, login_error="Introduce email y PIN.")
 
-    participant = get_storage().get_participant_by_email(email)
+    try:
+        participant = get_storage().get_participant_by_email(email)
+    except Exception:
+        return render_template_string(
+            WELCOME_TEMPLATE,
+            login_error="Error de conexión. Inténtalo de nuevo en un momento.",
+        )
+
     if not participant or not participant.get("password_hash"):
         return render_template_string(
             WELCOME_TEMPLATE,
@@ -433,13 +442,32 @@ def register():
             suggested_name=name,
         )
 
-    storage = get_storage()
-    if storage.get_participant_by_email(email):
-        return render_template_string(WELCOME_TEMPLATE, register_error="Ese email ya está registrado.", suggested_name=name)
+    try:
+        storage = get_storage()
+        if storage.get_participant_by_email(email):
+            return render_template_string(
+                WELCOME_TEMPLATE,
+                register_error="Ese email ya está registrado.",
+                suggested_name=name,
+            )
 
-    password_hash = generate_password_hash(password)
-    storage.create_participant(name, email, password_hash)
-    participant = storage.get_participant_by_email(email)
+        password_hash = generate_password_hash(password)
+        storage.create_participant(name, email, password_hash)
+        participant = storage.get_participant_by_email(email)
+    except Exception:
+        return render_template_string(
+            WELCOME_TEMPLATE,
+            register_error="Error de conexión. Inténtalo de nuevo en un momento.",
+            suggested_name=name,
+        )
+
+    if not participant:
+        return render_template_string(
+            WELCOME_TEMPLATE,
+            register_error="Registro completado pero no se pudo iniciar sesión. Intenta entrar con tu email y PIN.",
+            suggested_name=name,
+        )
+
     session["participant_id"] = participant["id"]
     session["participant_name"] = participant["name"]
     session["participant_email"] = participant["email"]
@@ -454,9 +482,12 @@ def logout():
 
 @public_bp.route("/ranking")
 def ranking():
-    storage = get_storage()
-    participants = storage.load_participants()
-    results = storage.load_results()
+    try:
+        storage = get_storage()
+        participants = storage.load_participants()
+        results = storage.load_results()
+    except Exception:
+        participants, results = {}, {}
     standings = build_standings(participants, results)
 
     return render_template_string(
