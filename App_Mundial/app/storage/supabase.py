@@ -171,21 +171,32 @@ def save_participant(name, prediction, email=None, password_hash=None):
     _check(requests.post(_url("participants"), headers=h, json=payload))
 
 
-def load_results():
+def _load_row():
     r = _check(requests.get(
         _url("results"),
         headers=_headers(),
-        params={"select": "results_json", "id": "eq.1", "limit": "1"},
+        params={"select": "results_json,fixtures_json", "id": "eq.1", "limit": "1"},
     ))
     data = r.json()
-    if not data:
-        return {}
-    return data[0].get("results_json") or {}
+    return data[0] if data else {}
+
+
+def load_results():
+    return _load_row().get("results_json") or {}
+
+
+def load_fixtures():
+    return _load_row().get("fixtures_json") or []
 
 
 def save_results(results):
     h = {**_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
     _check(requests.post(_url("results"), headers=h, json={"id": 1, "results_json": results}))
+
+
+def save_fixtures(fixtures):
+    h = {**_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
+    _check(requests.post(_url("results"), headers=h, json={"id": 1, "fixtures_json": fixtures}))
 
 
 def get_setting(key, default=None):

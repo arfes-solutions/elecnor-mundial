@@ -214,6 +214,57 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
+        {% elif vista == 'ver_horarios_dinamico' %}
+        <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
+                <h3 class="m-0 fw-bold text-success">📅 Partidos del Mundial (Hora Peninsular)</h3>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+            </div>
+            <div class="row">
+                {% for sec_key, sec in sections.items() %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-header bg-success text-white fw-bold text-center py-2">{{ sec.label }}</div>
+                        <div class="card-body p-3">
+                            <div class="d-flex flex-column gap-3">
+                                {% for p in sec.partidos %}
+                                <div class="bg-white border rounded p-2 shadow-sm {% if p.is_live %}border-warning border-2{% endif %}">
+                                    <div class="text-center text-muted small mb-2 fw-bold border-bottom pb-1 d-flex justify-content-between align-items-center px-1">
+                                        <span class="text-success">{{ p.jornada or p.stage_label }}</span>
+                                        <span>{{ p.fecha }} - {{ p.hora }}</span>
+                                        {% if p.is_live %}
+                                        <span class="badge bg-danger">EN VIVO</span>
+                                        {% elif p.is_finished %}
+                                        <span class="badge bg-secondary">Finalizado</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="text-end" style="width:40%; font-size:0.9rem;">
+                                            <span class="fw-bold">{{ p.home.name }}</span>
+                                            {% if p.home.flag %}<img src="https://flagcdn.com/w20/{{ p.home.flag }}.png" width="20" class="ms-1">{% endif %}
+                                        </div>
+                                        <div class="text-center fw-bold" style="width:20%;">
+                                            {% if p.is_finished or p.is_live %}
+                                            <span class="text-success fs-5">{{ p.home_score }} - {{ p.away_score }}</span>
+                                            {% else %}
+                                            <span class="text-secondary">vs</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-start" style="width:40%; font-size:0.9rem;">
+                                            {% if p.away.flag %}<img src="https://flagcdn.com/w20/{{ p.away.flag }}.png" width="20" class="me-1">{% endif %}
+                                            <span class="fw-bold">{{ p.away.name }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         {% elif vista == 'ver_horarios' %}
         <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
             <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
@@ -805,6 +856,46 @@ def ver_grupos():
 
 @public_bp.route("/horarios")
 def ver_horarios():
+    # Try dynamic fixtures from DB first
+    fixtures = []
+    try:
+        fixtures = get_storage().load_fixtures()
+    except Exception:
+        pass
+
+    if fixtures:
+        # Group fixtures by stage/group for display
+        from collections import OrderedDict
+        sections = OrderedDict()  # key → {"label": str, "partidos": [...]}
+
+        stage_order = [
+            "GROUP_STAGE", "ROUND_OF_32", "LAST_32",
+            "ROUND_OF_16", "LAST_16", "QUARTER_FINALS",
+            "SEMI_FINALS", "THIRD_PLACE", "FINAL",
+        ]
+        # Sort fixtures by date within each group
+        def _sort_key(f):
+            stage_idx = stage_order.index(f["stage"]) if f["stage"] in stage_order else 99
+            return (stage_idx, f.get("group", ""), f.get("fecha", ""), f.get("hora", ""))
+
+        fixtures_sorted = sorted(fixtures, key=_sort_key)
+
+        for f in fixtures_sorted:
+            stage = f["stage"]
+            group = f.get("group", "")
+            if stage == "GROUP_STAGE":
+                sec_key = f"grupo_{group}"
+                label   = f"Grupo {group}"
+            else:
+                sec_key = stage
+                label   = f["stage_label"]
+            if sec_key not in sections:
+                sections[sec_key] = {"label": label, "partidos": []}
+            sections[sec_key]["partidos"].append(f)
+
+        return _render("ver_horarios_dinamico", sections=sections)
+
+    # Fallback to hardcoded calendar
     return _render("ver_horarios", calendario=_generar_calendario())
 
 
@@ -918,15 +1009,18 @@ def admin():
                 msg, ok = "Falta FOOTBALL_DATA_API_KEY en las variables de entorno de Vercel.", False
             else:
                 try:
-                    new_results = fetch_results(api_key)
+                    from app.services.sync import fetch_all
+                    data = fetch_all(api_key)
+                    storage = get_storage()
+                    new_results = data.get("results", {})
                     if new_results:
-                        storage = get_storage()
                         existing = storage.load_results()
                         existing.update(new_results)
                         storage.save_results(existing)
-                        msg, ok = f"Sincronizado correctamente. Campos: {', '.join(new_results.keys())}", True
-                    else:
-                        msg, ok = "Sin datos nuevos aún (el torneo quizás no ha empezado).", True
+                    fixtures = data.get("fixtures", [])
+                    if fixtures:
+                        storage.save_fixtures(fixtures)
+                    msg, ok = f"Sincronizado: {len(new_results)} resultados, {len(fixtures)} partidos.", True
                 except Exception as exc:
                     msg, ok = f"Error al sincronizar: {exc}", False
 
@@ -1111,7 +1205,7 @@ def admin():
 @public_bp.route("/sync")
 def sync_results():
     from flask import current_app
-    from app.services.sync import fetch_results
+    from app.services.sync import fetch_all
     secret = current_app.config.get("SYNC_SECRET", "")
     if secret and request.args.get("secret") != secret:
         return {"error": "unauthorized"}, 401
@@ -1119,13 +1213,23 @@ def sync_results():
     if not api_key:
         return {"error": "FOOTBALL_DATA_API_KEY not configured"}, 500
     try:
-        new_results = fetch_results(api_key)
+        data = fetch_all(api_key)
+        storage = get_storage()
+        # Save results (merge with existing manual entries)
+        new_results = data.get("results", {})
         if new_results:
-            storage = get_storage()
             existing = storage.load_results()
             existing.update(new_results)
             storage.save_results(existing)
-        return {"status": "ok", "updated_keys": list(new_results.keys())}
+        # Save fixtures (full replace)
+        fixtures = data.get("fixtures", [])
+        if fixtures:
+            storage.save_fixtures(fixtures)
+        return {
+            "status": "ok",
+            "results_keys": list(new_results.keys()),
+            "fixtures_count": len(fixtures),
+        }
     except Exception as exc:
         return {"error": str(exc)}, 500
 
