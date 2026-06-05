@@ -1189,7 +1189,7 @@ def admin():
 <div class="container-fluid px-4 mb-5" style="max-width:1300px;">
   <div class="d-flex justify-content-between align-items-center py-3 mb-4 border-bottom border-success">
     <h2 class="fw-bold text-success m-0">⚙️ Panel de Administrador</h2>
-    <a href="/" class="btn btn-outline-success fw-bold">← Volver a la app</a>
+    <a href="/" class="btn btn-outline-success fw-bold">Clasificación actual</a>
   </div>
 
   {% if not authed %}
