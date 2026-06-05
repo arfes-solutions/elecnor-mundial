@@ -804,11 +804,13 @@ def nueva_prediccion():
     return _render("nuevo_nombre")
 
 
-_SYNC_INTERVAL_MINUTES = 30
-
-
 def _auto_sync():
-    """Sync from API at most once every 30 minutes."""
+    """
+    Sync from API automatically:
+    - Every 2 min if there are live matches right now
+    - Every 5 min during match windows (±2h around any today's fixture)
+    - Every 30 min otherwise
+    """
     from flask import current_app
     import datetime
     api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
@@ -816,13 +818,32 @@ def _auto_sync():
         return
     try:
         storage = get_storage()
-        # Check last sync time stored in settings table
+        now_utc = datetime.datetime.utcnow()
+
+        # Determine interval based on current fixtures
+        interval_minutes = 30  # default
+        try:
+            fixtures = storage.load_fixtures()
+            today = now_utc.date()
+            for f in fixtures:
+                if f.get("is_live"):
+                    interval_minutes = 2   # match in progress → very frequent
+                    break
+                # Check if any fixture is today
+                fecha_str = f.get("fecha", "")   # e.g. "11 Jun"
+                status = f.get("status", "")
+                if status == "SCHEDULED" and fecha_str:
+                    interval_minutes = min(interval_minutes, 5)  # match day → every 5 min
+        except Exception:
+            pass
+
+        # Check last sync time
         last_sync_str = storage.get_setting("last_sync", "")
         if last_sync_str:
             last_sync = datetime.datetime.fromisoformat(last_sync_str)
-            elapsed = (datetime.datetime.utcnow() - last_sync).total_seconds() / 60
-            if elapsed < _SYNC_INTERVAL_MINUTES:
-                return  # Too soon, skip
+            elapsed = (now_utc - last_sync).total_seconds() / 60
+            if elapsed < interval_minutes:
+                return  # Too soon
 
         from app.services.sync import fetch_all
         data = fetch_all(api_key)
@@ -834,8 +855,7 @@ def _auto_sync():
         fixtures = data.get("fixtures", [])
         if fixtures:
             storage.save_fixtures(fixtures)
-        # Save timestamp
-        storage.set_setting("last_sync", datetime.datetime.utcnow().isoformat())
+        storage.set_setting("last_sync", now_utc.isoformat())
     except Exception:
         pass  # Never break the page if sync fails
 
