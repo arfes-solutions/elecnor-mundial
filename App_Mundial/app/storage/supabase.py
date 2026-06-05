@@ -32,6 +32,47 @@ def load_participants():
     return {row["name"]: row.get("prediction_json") or {} for row in r.json()}
 
 
+def load_participants_full():
+    r = _check(requests.get(
+        _url("participants"),
+        headers=_headers(),
+        params={"select": "id,name,prediction_json", "order": "created_at"},
+    ))
+    return r.json()
+
+
+def get_participant_by_id(participant_id):
+    r = _check(requests.get(
+        _url("participants"),
+        headers=_headers(),
+        params={
+            "select": "id,name,email,password_hash,prediction_json",
+            "id": f"eq.{participant_id}",
+            "limit": "1",
+        },
+    ))
+    data = r.json()
+    if not data:
+        return None
+    row = data[0]
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "email": row.get("email"),
+        "password_hash": row.get("password_hash"),
+        "prediction": row.get("prediction_json") or {},
+    }
+
+
+def update_prediction(participant_id, prediction):
+    _check(requests.patch(
+        _url("participants"),
+        headers=_headers(),
+        params={"id": f"eq.{participant_id}"},
+        json={"prediction_json": prediction},
+    ))
+
+
 def get_participant_by_email(email):
     r = _check(requests.get(
         _url("participants"),
