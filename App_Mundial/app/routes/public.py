@@ -817,15 +817,19 @@ def _get_match_info():
         fixtures = get_storage().load_fixtures()
         live = [f for f in fixtures if f.get("is_live")]
         now_utc = datetime.datetime.utcnow()
-        nxt = None
+
+        # Sort scheduled fixtures by utc_date ascending to get the earliest one
+        scheduled = []
         for f in fixtures:
             if f.get("status") == "SCHEDULED" and f.get("utc_date"):
                 try:
-                    if datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ") > now_utc:
-                        nxt = f
-                        break
+                    dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
+                    if dt > now_utc:
+                        scheduled.append((dt, f))
                 except Exception:
                     pass
+        scheduled.sort(key=lambda x: x[0])
+        nxt = scheduled[0][1] if scheduled else None
         return live, nxt
     except Exception:
         return [], None
@@ -1055,19 +1059,20 @@ def _render_ranking():
     # Live matches
     live_matches = [f for f in fixtures if f.get("is_live")]
 
-    # Next scheduled match (first SCHEDULED fixture with a utc_date)
+    # Next scheduled match: sort by utc_date to get the earliest one
     import datetime
     now_utc = datetime.datetime.utcnow()
-    next_match = None
+    scheduled = []
     for f in fixtures:
         if f.get("status") == "SCHEDULED" and f.get("utc_date"):
             try:
-                match_dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
-                if match_dt > now_utc:
-                    next_match = f
-                    break
+                dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
+                if dt > now_utc:
+                    scheduled.append((dt, f))
             except Exception:
                 pass
+    scheduled.sort(key=lambda x: x[0])
+    next_match = scheduled[0][1] if scheduled else None
 
     return _render("inicio", clasificacion=standings,
                    live_matches=live_matches, next_match=next_match)
