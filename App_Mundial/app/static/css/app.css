@@ -99,6 +99,85 @@ a {
   padding: 34px 0 56px;
 }
 
+.welcome-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  width: min(1080px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 48px 0 64px;
+}
+
+.welcome-hero {
+  padding: clamp(32px, 6vw, 62px);
+  background:
+    linear-gradient(120deg, rgba(15, 107, 79, 0.95), rgba(29, 79, 145, 0.9)),
+    repeating-linear-gradient(90deg, transparent, transparent 46px, rgba(255,255,255,0.08) 47px);
+  color: white;
+  border-radius: 8px;
+}
+
+.welcome-hero .eyebrow,
+.welcome-hero .lead {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.welcome-hero h1 {
+  margin-bottom: 14px;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.auth-panel {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.auth-panel-accent {
+  border-color: rgba(15, 107, 79, 0.28);
+  box-shadow: inset 4px 0 0 var(--pitch);
+}
+
+.auth-panel label {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.auth-panel input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+}
+
+.auth-panel input:focus {
+  outline: 3px solid rgba(15, 107, 79, 0.16);
+  border-color: var(--pitch);
+}
+
+.button-wide {
+  width: 100%;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.form-error {
+  margin: 0;
+  color: #a33a2a;
+  font-weight: 700;
+}
+
 .hero-panel {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.7fr);
@@ -302,7 +381,8 @@ h2 {
 @media (max-width: 860px) {
   .topbar,
   .hero-panel,
-  .section-grid {
+  .section-grid,
+  .auth-grid {
     grid-template-columns: 1fr;
   }
 
