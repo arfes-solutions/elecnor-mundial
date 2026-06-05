@@ -46,8 +46,8 @@ HTML_TEMPLATE = """
             border-radius: 0 0 40px 40px;
             box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
         }
-        .header-banner h1 { font-size: clamp(1.2rem, 3vw, 1.6rem); font-weight: 700; letter-spacing: 1px; text-shadow: 1px 1px 3px rgba(0,0,0,0.2); margin: 0; }
-        .header-banner p { font-size: clamp(0.7rem, 1.5vw, 0.9rem); font-weight: 400; margin: 0; opacity: 0.9; }
+        .header-banner h1 { font-size: clamp(1rem, 2.5vw, 1.6rem); font-weight: 700; letter-spacing: 1px; text-shadow: 1px 1px 3px rgba(0,0,0,0.2); margin: 0; }
+        .header-banner p { font-size: clamp(0.65rem, 1.2vw, 0.9rem); font-weight: 400; margin: 0; opacity: 0.9; }
         .card { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: none; background-color: rgba(255,255,255,0.98); }
         .table-custom-header { background-color: #0f5132 !important; color: white !important; }
         .puntos-oro { color: #d4af37; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
@@ -65,22 +65,71 @@ HTML_TEMPLATE = """
         .fase-section { display: none; }
         .fase-active { display: block; animation: fadeIn 0.5s; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Próximo partido / EN VIVO en navbar */
+        .nav-match-pill {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: clamp(0.62rem, 1.1vw, 0.78rem);
+            color: white;
+            white-space: nowrap;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .nav-match-pill.live { background: rgba(220,53,69,0.25); border-color: rgba(220,53,69,0.5); }
+
+        /* Responsive */
+        @media (max-width: 767px) {
+            body { padding-top: 130px; }
+            .header-banner { padding: .7rem 1rem; }
+            .nav-match-pill { font-size: .62rem; padding: 3px 8px; }
+            .table td, .table th { font-size: .82rem; padding: .4rem .5rem; }
+            .fs-4 { font-size: 1rem !important; }
+            .fs-5 { font-size: .9rem !important; }
+            .px-4 { padding-left: .75rem !important; padding-right: .75rem !important; }
+        }
+        @media (max-width: 480px) {
+            body { padding-top: 150px; }
+            .btn { padding: .35rem .6rem; font-size: .78rem; }
+        }
     </style>
 </head>
 <body>
     <div class="header-banner">
         <div class="d-flex flex-wrap justify-content-between align-items-center mx-auto gap-2" style="max-width: 1400px;">
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-shrink-0">
                 <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
-                <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">
-                    Reglas
-                </button>
+                <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">Reglas</button>
             </div>
+
             <div class="text-center flex-grow-1 d-none d-md-block">
                 <h1>PORRA MUNDIAL 2026</h1>
                 <p>Elecnor Sistemas</p>
             </div>
-            <div class="d-flex gap-2">
+
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                {# Widget próximo partido / EN VIVO entre título y botones #}
+                {% if live_matches %}
+                    {% set m = live_matches[0] %}
+                    <div class="nav-match-pill live d-none d-md-flex">
+                        <span style="animation:pulse 1s infinite">🔴</span>
+                        {% if m.home.flag %}<img src="https://flagcdn.com/w16/{{ m.home.flag }}.png" height="12">{% endif %}
+                        <strong>{{ m.home_score }}-{{ m.away_score }}</strong>
+                        {% if m.away.flag %}<img src="https://flagcdn.com/w16/{{ m.away.flag }}.png" height="12">{% endif %}
+                    </div>
+                {% elif next_match %}
+                    <div class="nav-match-pill d-none d-md-flex flex-column align-items-center" style="line-height:1.2;">
+                        <span style="opacity:.75;font-size:.6rem;">Próximo</span>
+                        <span>
+                            {% if next_match.home.flag %}<img src="https://flagcdn.com/w16/{{ next_match.home.flag }}.png" height="11">{% endif %}
+                            vs
+                            {% if next_match.away.flag %}<img src="https://flagcdn.com/w16/{{ next_match.away.flag }}.png" height="11">{% endif %}
+                            · <span id="countdown-nav">--:--</span>
+                        </span>
+                    </div>
+                {% endif %}
+
                 <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
                 <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
             </div>
@@ -91,40 +140,20 @@ HTML_TEMPLATE = """
 
         {% if vista == 'inicio' %}
 
-        {# ── BANNER PARTIDO EN VIVO ── #}
+        {# ── BANNER EN VIVO (solo mobile, en desktop va en navbar) ── #}
         {% if live_matches %}
-        <div class="mx-auto mb-3" style="max-width:1200px;">
+        <div class="mx-auto mb-3 d-md-none" style="max-width:1200px;">
             {% for m in live_matches %}
-            <div class="alert mb-2 py-2 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2"
-                 style="background:#0f5132;color:white;border-radius:12px;border:none;box-shadow:0 4px 15px rgba(25,135,84,.4);">
-                <span class="badge bg-danger me-2 fs-6" style="animation:pulse 1s infinite;">🔴 EN VIVO</span>
-                <span class="fw-bold fs-5">
-                    {% if m.home.flag %}<img src="https://flagcdn.com/w20/{{ m.home.flag }}.png" width="22" class="me-1">{% endif %}
-                    {{ m.home.name }}
-                    <span class="mx-3 text-warning fw-bold fs-4">{{ m.home_score }} - {{ m.away_score }}</span>
-                    {{ m.away.name }}
-                    {% if m.away.flag %}<img src="https://flagcdn.com/w20/{{ m.away.flag }}.png" width="22" class="ms-1">{% endif %}
+            <div class="alert mb-2 py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+                 style="background:#0f5132;color:white;border-radius:12px;border:none;">
+                <span class="badge bg-danger">🔴 EN VIVO</span>
+                <span class="fw-bold">
+                    {% if m.home.flag %}<img src="https://flagcdn.com/w20/{{ m.home.flag }}.png" width="18" class="me-1">{% endif %}
+                    {{ m.home.name }} <span class="text-warning mx-2">{{ m.home_score }}-{{ m.away_score }}</span> {{ m.away.name }}
+                    {% if m.away.flag %}<img src="https://flagcdn.com/w20/{{ m.away.flag }}.png" width="18" class="ms-1">{% endif %}
                 </span>
-                <span class="text-white-50 small">{{ m.stage_label }}</span>
             </div>
             {% endfor %}
-        </div>
-        {% endif %}
-
-        {# ── CUENTA ATRÁS PRÓXIMO PARTIDO ── #}
-        {% if next_match and not live_matches %}
-        <div class="mx-auto mb-3 text-center" style="max-width:1200px;">
-            <div class="card py-2 px-4 d-inline-flex align-items-center gap-3 flex-wrap"
-                 style="border-radius:12px;border:2px solid #198754;background:#f0faf5;">
-                <span class="text-success fw-bold">⏱ Próximo partido:</span>
-                <span class="fw-bold">
-                    {% if next_match.home.flag %}<img src="https://flagcdn.com/w20/{{ next_match.home.flag }}.png" width="20" class="me-1">{% endif %}
-                    {{ next_match.home.name }} vs {{ next_match.away.name }}
-                    {% if next_match.away.flag %}<img src="https://flagcdn.com/w20/{{ next_match.away.flag }}.png" width="20" class="ms-1">{% endif %}
-                </span>
-                <span class="text-muted small">{{ next_match.fecha }} · {{ next_match.hora }}</span>
-                <span id="countdown" class="badge bg-success fs-6 px-3">--:--:--</span>
-            </div>
         </div>
         {% endif %}
 
@@ -187,12 +216,14 @@ HTML_TEMPLATE = """
             var target = new Date("{{ next_match.utc_date }}");
             function tick(){
                 var diff = target - new Date();
-                if(diff <= 0){ document.getElementById('countdown').textContent = '¡Empieza ahora!'; return; }
+                var el = document.getElementById('countdown-nav');
+                if(!el) return;
+                if(diff <= 0){ el.textContent = '¡Ya!'; return; }
                 var h = Math.floor(diff/3600000);
                 var m = Math.floor((diff%3600000)/60000);
                 var s = Math.floor((diff%60000)/1000);
-                document.getElementById('countdown').textContent =
-                    String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+                el.textContent = (h>0 ? String(h).padStart(2,'0')+':' : '') +
+                    String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
                 setTimeout(tick, 1000);
             }
             tick();
@@ -779,11 +810,38 @@ HTML_TEMPLATE = """
 """
 
 
+def _get_match_info():
+    """Get live matches and next match for navbar widget."""
+    import datetime
+    try:
+        fixtures = get_storage().load_fixtures()
+        live = [f for f in fixtures if f.get("is_live")]
+        now_utc = datetime.datetime.utcnow()
+        nxt = None
+        for f in fixtures:
+            if f.get("status") == "SCHEDULED" and f.get("utc_date"):
+                try:
+                    if datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ") > now_utc:
+                        nxt = f
+                        break
+                except Exception:
+                    pass
+        return live, nxt
+    except Exception:
+        return [], None
+
+
 def _render(vista, **kwargs):
+    live_matches = kwargs.pop("live_matches", None)
+    next_match   = kwargs.pop("next_match", None)
+    if live_matches is None and next_match is None:
+        live_matches, next_match = _get_match_info()
     return render_template_string(
         HTML_TEMPLATE,
         vista=vista,
         authenticated=session.get("authenticated", False),
+        live_matches=live_matches,
+        next_match=next_match,
         **kwargs,
     )
 
