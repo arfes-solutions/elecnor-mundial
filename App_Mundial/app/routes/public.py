@@ -90,6 +90,44 @@ HTML_TEMPLATE = """
     <div class="container-fluid px-4 mb-5">
 
         {% if vista == 'inicio' %}
+
+        {# ── BANNER PARTIDO EN VIVO ── #}
+        {% if live_matches %}
+        <div class="mx-auto mb-3" style="max-width:1200px;">
+            {% for m in live_matches %}
+            <div class="alert mb-2 py-2 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2"
+                 style="background:#0f5132;color:white;border-radius:12px;border:none;box-shadow:0 4px 15px rgba(25,135,84,.4);">
+                <span class="badge bg-danger me-2 fs-6" style="animation:pulse 1s infinite;">🔴 EN VIVO</span>
+                <span class="fw-bold fs-5">
+                    {% if m.home.flag %}<img src="https://flagcdn.com/w20/{{ m.home.flag }}.png" width="22" class="me-1">{% endif %}
+                    {{ m.home.name }}
+                    <span class="mx-3 text-warning fw-bold fs-4">{{ m.home_score }} - {{ m.away_score }}</span>
+                    {{ m.away.name }}
+                    {% if m.away.flag %}<img src="https://flagcdn.com/w20/{{ m.away.flag }}.png" width="22" class="ms-1">{% endif %}
+                </span>
+                <span class="text-white-50 small">{{ m.stage_label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# ── CUENTA ATRÁS PRÓXIMO PARTIDO ── #}
+        {% if next_match and not live_matches %}
+        <div class="mx-auto mb-3 text-center" style="max-width:1200px;">
+            <div class="card py-2 px-4 d-inline-flex align-items-center gap-3 flex-wrap"
+                 style="border-radius:12px;border:2px solid #198754;background:#f0faf5;">
+                <span class="text-success fw-bold">⏱ Próximo partido:</span>
+                <span class="fw-bold">
+                    {% if next_match.home.flag %}<img src="https://flagcdn.com/w20/{{ next_match.home.flag }}.png" width="20" class="me-1">{% endif %}
+                    {{ next_match.home.name }} vs {{ next_match.away.name }}
+                    {% if next_match.away.flag %}<img src="https://flagcdn.com/w20/{{ next_match.away.flag }}.png" width="20" class="ms-1">{% endif %}
+                </span>
+                <span class="text-muted small">{{ next_match.fecha }} · {{ next_match.hora }}</span>
+                <span id="countdown" class="badge bg-success fs-6 px-3">--:--:--</span>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card p-2 p-md-4 mx-auto" style="max-width: 1200px;">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
@@ -109,9 +147,17 @@ HTML_TEMPLATE = """
                         <tbody>
                             {% for jug in clasificacion %}
                             <tr>
-                                <td class="fw-bold fs-5">{{ loop.index }}º</td>
+                                <td class="fw-bold fs-5">
+                                    {% if loop.index == 1 %}🥇
+                                    {% elif loop.index == 2 %}🥈
+                                    {% elif loop.index == 3 %}🥉
+                                    {% else %}{{ loop.index }}º{% endif %}
+                                </td>
                                 <td class="fw-bold fs-5">{{ jug.name }}</td>
-                                <td class="text-center fw-bold fs-4 puntos-oro">{{ jug.points }} pts</td>
+                                <td class="text-center fw-bold fs-4 puntos-oro" data-pts="{{ jug.points }}" data-name="{{ jug.name }}">
+                                    {{ jug.points }} pts
+                                    <span class="pts-delta d-none fw-bold text-success small"></span>
+                                </td>
                                 <td class="text-end">
                                     <a href="{{ url_for('public.ver_prediccion', participant_id=jug.id) }}" class="btn btn-sm btn-outline-custom px-3">Ver predicción</a>
                                 </td>
@@ -124,6 +170,53 @@ HTML_TEMPLATE = """
                 </div>
             </div>
         </div>
+
+        <style>
+            @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+            @keyframes popUp { 0%{opacity:0;transform:translateY(-8px) scale(.8)} 60%{transform:translateY(2px) scale(1.1)} 100%{opacity:1;transform:none} }
+            .pts-delta { animation: popUp .5s ease forwards; font-size:1rem; margin-left:6px; }
+        </style>
+
+        <script>
+        // ── Auto-refresh cada 15 segundos ──────────────────────────────
+        setTimeout(function(){ location.reload(); }, 15000);
+
+        // ── Cuenta atrás próximo partido ───────────────────────────────
+        {% if next_match and not live_matches %}
+        (function(){
+            var target = new Date("{{ next_match.utc_date }}");
+            function tick(){
+                var diff = target - new Date();
+                if(diff <= 0){ document.getElementById('countdown').textContent = '¡Empieza ahora!'; return; }
+                var h = Math.floor(diff/3600000);
+                var m = Math.floor((diff%3600000)/60000);
+                var s = Math.floor((diff%60000)/1000);
+                document.getElementById('countdown').textContent =
+                    String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+                setTimeout(tick, 1000);
+            }
+            tick();
+        })();
+        {% endif %}
+
+        // ── Animación de puntos (compara con localStorage) ─────────────
+        (function(){
+            var stored = {};
+            try { stored = JSON.parse(localStorage.getItem('porra_pts') || '{}'); } catch(e){}
+            var current = {};
+            document.querySelectorAll('[data-pts]').forEach(function(el){
+                var name = el.dataset.name;
+                var pts  = parseInt(el.dataset.pts);
+                current[name] = pts;
+                if(stored[name] !== undefined && pts > stored[name]){
+                    var delta = el.querySelector('.pts-delta');
+                    delta.textContent = '+' + (pts - stored[name]);
+                    delta.classList.remove('d-none');
+                }
+            });
+            localStorage.setItem('porra_pts', JSON.stringify(current));
+        })();
+        </script>
 
         {% elif vista == 'login_register' %}
         <div class="row justify-content-center mt-2">
@@ -887,8 +980,10 @@ def _render_ranking():
         storage = get_storage()
         participants = storage.load_participants()
         results = storage.load_results()
+        fixtures = storage.load_fixtures()
     except Exception:
-        participants, results = {}, {}
+        participants, results, fixtures = {}, {}, []
+
     standings = build_standings(participants, results)
     try:
         all_p = get_storage().load_participants_full()
@@ -898,7 +993,26 @@ def _render_ranking():
     except Exception:
         for row in standings:
             row["id"] = ""
-    return _render("inicio", clasificacion=standings)
+
+    # Live matches
+    live_matches = [f for f in fixtures if f.get("is_live")]
+
+    # Next scheduled match (first SCHEDULED fixture with a utc_date)
+    import datetime
+    now_utc = datetime.datetime.utcnow()
+    next_match = None
+    for f in fixtures:
+        if f.get("status") == "SCHEDULED" and f.get("utc_date"):
+            try:
+                match_dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
+                if match_dt > now_utc:
+                    next_match = f
+                    break
+            except Exception:
+                pass
+
+    return _render("inicio", clasificacion=standings,
+                   live_matches=live_matches, next_match=next_match)
 
 
 @public_bp.route("/ranking")

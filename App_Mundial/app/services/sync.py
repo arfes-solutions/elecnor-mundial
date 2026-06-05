@@ -173,19 +173,20 @@ def fetch_all(api_key: str) -> dict:
 
             # Build fixture entry
             fixture = {
-                "stage":      stage,
+                "stage":       stage,
                 "stage_label": label,
-                "group":      group_letter,           # "A", "B", … or ""
-                "jornada":    f"Jornada {matchday}" if stage == "GROUP_STAGE" else "",
-                "fecha":      fecha,
-                "hora":       hora,
-                "home":       {"name": home_name, "flag": _flag(home_name)},
-                "away":       {"name": away_name, "flag": _flag(away_name)},
-                "home_score": home_score,
-                "away_score": away_score,
-                "status":     status,
+                "group":       group_letter,
+                "jornada":     f"Jornada {matchday}" if stage == "GROUP_STAGE" else "",
+                "fecha":       fecha,
+                "hora":        hora,
+                "utc_date":    utc_date,
+                "home":        {"name": home_name, "flag": _flag(home_name)},
+                "away":        {"name": away_name, "flag": _flag(away_name)},
+                "home_score":  home_score,
+                "away_score":  away_score,
+                "status":      status,
                 "is_finished": is_finished,
-                "is_live":    is_live,
+                "is_live":     is_live,
             }
             fixtures.append(fixture)
 
