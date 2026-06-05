@@ -1,10 +1,22 @@
 import os
+from pathlib import Path
 
 from flask import Flask
 
 
 def create_app(test_config=None):
-    app = Flask(__name__, instance_relative_config=True)
+    project_root = Path(__file__).resolve().parents[1]
+    api_templates = project_root / "api" / "templates"
+    api_static = project_root / "api" / "static"
+    template_folder = api_templates if api_templates.exists() else project_root / "app" / "templates"
+    static_folder = api_static if api_static.exists() else project_root / "app" / "static"
+
+    app = Flask(
+        __name__,
+        instance_relative_config=True,
+        template_folder=str(template_folder),
+        static_folder=str(static_folder),
+    )
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-change-me"),
         DATABASE="mundial.db",
