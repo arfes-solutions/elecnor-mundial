@@ -538,9 +538,9 @@ function buildGrid(teams, gridId, prefix, nameAttr, sectionId) {
   var sec = document.getElementById(sectionId);
   if (sec) sec.classList.add('active');
 
-  if (nameAttr === 'cuartos') setupPhase('chk-cuartos','grid-semis','sem','semis',8,'cnt-sem','sec-semis');
-  if (nameAttr === 'semis')   setupPhase('chk-semis','grid-final','fin','final',4,'cnt-fin','sec-final');
-  if (nameAttr === 'final')   setupPhase('chk-final','grid-campeon','camp','campeon',2,'cnt-fin2','sec-campeon');
+  if (nameAttr === 'cuartos') setupPhase('chk-cuartos','grid-semis','sem','semis',8,'cnt-cua','sec-semis');
+  if (nameAttr === 'semis')   setupPhase('chk-semis','grid-final','fin','final',4,'cnt-sem','sec-final');
+  if (nameAttr === 'final')   setupPhase('chk-final','grid-campeon','camp','campeon',2,'cnt-fin','sec-campeon');
   if (nameAttr === 'campeon') {
     Array.from(document.querySelectorAll('.chk-campeon')).forEach(function(r){
       r.addEventListener('change', function(){
