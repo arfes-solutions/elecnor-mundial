@@ -96,7 +96,30 @@ def get_participant_by_email(email):
     }
 
 
+def get_participant_by_name(name):
+    r = _check(requests.get(
+        _url("participants"),
+        headers=_headers(),
+        params={
+            "select": "id,name,email,password_hash,prediction_json",
+            "name": f"ilike.{name.strip()}",
+            "limit": "1",
+        },
+    ))
+    data = r.json()
+    if not data:
+        return None
+    row = data[0]
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "password_hash": row.get("password_hash"),
+        "prediction": row.get("prediction_json") or {},
+    }
+
+
 def create_participant(name, email, password_hash):
+    # email is kept for DB compatibility but can be a dummy value
     _check(requests.post(
         _url("participants"),
         headers=_headers(),

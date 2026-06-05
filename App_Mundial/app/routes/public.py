@@ -138,46 +138,25 @@ HTML_TEMPLATE = """
         </div>
 
         {% elif vista == 'login_register' %}
-        <div class="row justify-content-center g-4 mt-2">
-            <div class="col-md-5">
+        <div class="row justify-content-center mt-2">
+            <div class="col-md-5 col-lg-4">
                 <div class="card p-4">
-                    <h4 class="fw-bold text-success border-bottom pb-3 mb-4 text-center">Ya tengo cuenta</h4>
-                    {% if login_error %}
-                    <div class="alert alert-danger py-2">{{ login_error }}</div>
+                    <h4 class="fw-bold text-success border-bottom pb-3 mb-1 text-center">⚽ Participar en la porra</h4>
+                    <p class="text-center text-muted small mb-4">Introduce tu nombre y la contraseña del grupo.<br>Si es tu primera vez, se te registra automáticamente.</p>
+                    {% if auth_error %}
+                    <div class="alert alert-danger py-2">{{ auth_error }}</div>
                     {% endif %}
                     <form method="POST" action="{{ url_for('public.login') }}">
                         <div class="mb-3">
-                            <label class="form-label fw-bold text-success">Email</label>
-                            <input type="email" name="email" class="form-control border-success" required autocomplete="email">
+                            <label class="form-label fw-bold text-success fs-5">Tu nombre</label>
+                            <input type="text" name="name" class="form-control form-control-lg border-success text-center" required
+                                   value="{{ suggested_name or '' }}" autocomplete="name" placeholder="Ej: Benito Martínez">
                         </div>
                         <div class="mb-4">
-                            <label class="form-label fw-bold text-success">PIN o contraseña</label>
-                            <input type="password" name="password" class="form-control border-success" required autocomplete="current-password">
+                            <label class="form-label fw-bold text-success fs-5">Contraseña del grupo</label>
+                            <input type="password" name="password" class="form-control form-control-lg border-success text-center" required autocomplete="current-password" placeholder="••••••••">
                         </div>
                         <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Entrar →</button>
-                    </form>
-                </div>
-            </div>
-            <div class="col-md-5">
-                <div class="card p-4 border-success border-2">
-                    <h4 class="fw-bold text-success border-bottom pb-3 mb-4 text-center">Nuevo participante</h4>
-                    {% if register_error %}
-                    <div class="alert alert-danger py-2">{{ register_error }}</div>
-                    {% endif %}
-                    <form method="POST" action="{{ url_for('public.register') }}">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-success">Nombre</label>
-                            <input type="text" name="name" class="form-control border-success" required value="{{ suggested_name or '' }}" autocomplete="name">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-success">Email</label>
-                            <input type="email" name="email" class="form-control border-success" required autocomplete="email">
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label fw-bold text-success">PIN (mínimo 4 caracteres)</label>
-                            <input type="password" name="password" class="form-control border-success" minlength="4" required autocomplete="new-password">
-                        </div>
-                        <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Registrarme ➕</button>
                     </form>
                 </div>
             </div>
@@ -710,23 +689,38 @@ def welcome():
     return _render("login_register")
 
 
+SHARED_PASSWORD = "Mundial26"
+
+
 @public_bp.post("/entrar")
 def login():
-    email = request.form.get("email", "").strip().lower()
+    name = request.form.get("name", "").strip()
     password = request.form.get("password", "")
-    if not email or not password:
-        return _render("login_register", login_error="Introduce email y PIN.")
+
+    if not name or not password:
+        return _render("login_register", auth_error="Introduce tu nombre y la contraseña.")
+
+    if password != SHARED_PASSWORD:
+        return _render("login_register", auth_error="Contraseña incorrecta. Pide la contraseña a los organizadores.", suggested_name=name)
+
     try:
-        participant = get_storage().get_participant_by_email(email)
+        storage = get_storage()
+        participant = storage.get_participant_by_name(name)
+
+        if not participant:
+            # First time → auto-register
+            dummy_email = name.lower().replace(" ", ".") + "@porra.elecnor"
+            storage.create_participant(name, dummy_email, generate_password_hash(SHARED_PASSWORD))
+            participant = storage.get_participant_by_name(name)
+
     except Exception as exc:
-        return _render("login_register", login_error=f"Error de conexión: {exc}")
-    if not participant or not participant.get("password_hash"):
-        return _render("login_register", login_error="No encontramos ese email.")
-    if not check_password_hash(participant["password_hash"], password):
-        return _render("login_register", login_error="El PIN no coincide.")
+        return _render("login_register", auth_error=f"Error de conexión: {exc}", suggested_name=name)
+
+    if not participant:
+        return _render("login_register", auth_error="No se pudo crear el participante. Inténtalo de nuevo.", suggested_name=name)
+
     session["participant_id"] = participant["id"]
     session["participant_name"] = participant["name"]
-    session["participant_email"] = participant["email"]
     pred = participant.get("prediction", {})
     if not pred.get("grupos"):
         return redirect(url_for("public.grupos_fase"))
@@ -735,27 +729,8 @@ def login():
 
 @public_bp.post("/registro")
 def register():
-    name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip().lower()
-    password = request.form.get("password", "")
-    if not name or not email or not password:
-        return _render("login_register", register_error="Completa nombre, email y PIN.")
-    if len(password) < 4:
-        return _render("login_register", register_error="El PIN debe tener al menos 4 caracteres.", suggested_name=name)
-    try:
-        storage = get_storage()
-        if storage.get_participant_by_email(email):
-            return _render("login_register", register_error="Ese email ya está registrado.", suggested_name=name)
-        storage.create_participant(name, email, generate_password_hash(password))
-        participant = storage.get_participant_by_email(email)
-    except Exception as exc:
-        return _render("login_register", register_error=f"Error al registrar: {exc}", suggested_name=name)
-    if not participant:
-        return _render("login_register", register_error="Registro OK pero error al iniciar sesión. Intenta entrar.", suggested_name=name)
-    session["participant_id"] = participant["id"]
-    session["participant_name"] = participant["name"]
-    session["participant_email"] = participant["email"]
-    return redirect(url_for("public.grupos_fase"))
+    # Kept for URL compatibility but redirects to login
+    return redirect(url_for("public.welcome"))
 
 
 @public_bp.route("/salir")
