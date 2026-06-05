@@ -182,7 +182,7 @@ HTML_TEMPLATE = """
         <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
             <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
                 <h3 class="m-0 fw-bold text-success">⚔️ Fase Eliminatoria</h3>
-                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">Clasificación actual</a>
             </div>
             {% for ronda_label, partidos in rondas.items() %}
             <h5 class="fw-bold text-success mb-3 mt-2">{{ ronda_label }}</h5>
@@ -202,9 +202,11 @@ HTML_TEMPLATE = """
                                 {% endif %}
                             </div>
                             <div class="d-flex justify-content-between align-items-center mt-2">
+                                {% set home_name = p.home.name if p.home.name and p.home.name not in ('?','None') else 'Por determinar' %}
+                                {% set away_name = p.away.name if p.away.name and p.away.name not in ('?','None') else 'Por determinar' %}
                                 <div class="text-end" style="width:40%;">
-                                    <span class="fw-bold">{{ p.home.name if p.home.name != '?' else 'Por determinar' }}</span>
-                                    {% if p.home.flag %}<img src="https://flagcdn.com/w20/{{ p.home.flag }}.png" width="20" class="ms-1">{% endif %}
+                                    <span class="fw-bold">{{ home_name }}</span>
+                                    {% if p.home.flag and home_name != 'Por determinar' %}<img src="https://flagcdn.com/w20/{{ p.home.flag }}.png" width="20" class="ms-1">{% endif %}
                                 </div>
                                 <div class="text-center fw-bold fs-5" style="width:20%;">
                                     {% if p.is_finished or p.is_live %}
@@ -214,8 +216,8 @@ HTML_TEMPLATE = """
                                     {% endif %}
                                 </div>
                                 <div class="text-start" style="width:40%;">
-                                    {% if p.away.flag %}<img src="https://flagcdn.com/w20/{{ p.away.flag }}.png" width="20" class="me-1">{% endif %}
-                                    <span class="fw-bold">{{ p.away.name if p.away.name != '?' else 'Por determinar' }}</span>
+                                    {% if p.away.flag and away_name != 'Por determinar' %}<img src="https://flagcdn.com/w20/{{ p.away.flag }}.png" width="20" class="me-1">{% endif %}
+                                    <span class="fw-bold">{{ away_name }}</span>
                                 </div>
                             </div>
                         </div>

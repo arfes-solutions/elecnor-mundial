@@ -99,7 +99,9 @@ _STATUS_FINISHED = {"FINISHED", "AWARDED"}
 _STATUS_LIVE     = {"IN_PLAY", "PAUSED", "HALF_TIME", "EXTRA_TIME", "PENALTY_SHOOTOUT"}
 
 
-def _norm(name: str) -> str:
+def _norm(name) -> str:
+    if not name:
+        return "?"
     return _NAME_MAP.get(name, name)
 
 def _flag(name: str) -> str:
