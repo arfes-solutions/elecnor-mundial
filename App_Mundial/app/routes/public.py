@@ -1,4 +1,5 @@
-from flask import Blueprint, redirect, render_template_string, request, url_for
+from flask import Blueprint, redirect, render_template_string, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.data.tournament import GROUPS, TEAMS
 from app.services.scoring import build_standings
@@ -43,6 +44,7 @@ WELCOME_TEMPLATE = """
     form .eyebrow { color:var(--muted); }
     label { color:var(--muted); font-weight:850; }
     input { width:100%; min-height:50px; padding:10px 13px; border:1px solid var(--line); border-radius:8px; color:var(--ink); font:inherit; }
+    .hint { margin:0; color:var(--muted); font-size:.92rem; line-height:1.45; }
     input:focus { outline:3px solid rgba(15,107,79,.16); border-color:var(--pitch); }
     .error { margin:0; color:#a33a2a; font-weight:750; }
     @media (max-width:820px) { body { padding-top:138px; } .topbar, .hero, .auth { grid-template-columns:1fr; } .brand { order:-1; } .nav, .nav:last-child { justify-content:center; } form, form.accent { border-right:0; border-top:1px solid var(--line); } .trophy { min-height:130px; } }
@@ -67,8 +69,10 @@ WELCOME_TEMPLATE = """
       <div class="auth">
         <form method="post" action="{{ url_for('public.login') }}">
           <div><p class="eyebrow">Acceso</p><h2>Ya participo</h2></div>
-          <label for="login-name">Nombre</label>
-          <input id="login-name" name="name" type="text" autocomplete="name" required>
+          <label for="login-email">Email</label>
+          <input id="login-email" name="email" type="email" autocomplete="email" required>
+          <label for="login-password">PIN o contraseña</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
           {% if login_error %}<p class="error">{{ login_error }}</p>{% endif %}
           <button class="button" type="submit">Entrar</button>
         </form>
@@ -76,6 +80,11 @@ WELCOME_TEMPLATE = """
           <div><p class="eyebrow">Registro</p><h2>Nuevo participante</h2></div>
           <label for="register-name">Nombre</label>
           <input id="register-name" name="name" type="text" autocomplete="name" value="{{ suggested_name or '' }}" required>
+          <label for="register-email">Email</label>
+          <input id="register-email" name="email" type="email" autocomplete="email" required>
+          <label for="register-password">PIN o contraseña</label>
+          <input id="register-password" name="password" type="password" minlength="4" autocomplete="new-password" required>
+          <p class="hint">Usa un PIN de al menos 4 caracteres. Te servirá para volver a entrar y editar tu predicción.</p>
           {% if register_error %}<p class="error">{{ register_error }}</p>{% endif %}
           <button class="button" type="submit">Registrarme</button>
         </form>
@@ -123,7 +132,7 @@ RANKING_TEMPLATE = """
   <header class="topbar">
     <nav class="nav"><a href="{{ url_for('public.welcome') }}">Inicio</a></nav>
     <a class="brand" href="{{ url_for('public.welcome') }}"><span class="mark">26</span><span>PORRA MUNDIAL 2026<small>Elecnor Sistemas</small></span></a>
-    <nav class="nav"><a href="{{ url_for('public.ranking') }}">Clasificación</a></nav>
+    <nav class="nav"><a href="{{ url_for('public.ranking') }}">Clasificación</a>{% if session.get('participant_name') %}<a href="{{ url_for('public.logout') }}">Salir</a>{% endif %}</nav>
   </header>
   <main class="shell">
     <section class="panel">
@@ -154,33 +163,54 @@ def welcome():
 
 @public_bp.post("/entrar")
 def login():
-    name = request.form.get("name", "").strip()
-    if not name:
-        return render_template_string(WELCOME_TEMPLATE, login_error="Introduce tu nombre.")
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    if not email or not password:
+        return render_template_string(WELCOME_TEMPLATE, login_error="Introduce email y PIN.")
 
-    participants = get_storage().load_participants()
-    if name not in participants:
+    participant = get_storage().get_participant_by_email(email)
+    if not participant or not participant.get("password_hash"):
         return render_template_string(
             WELCOME_TEMPLATE,
             login_error="No encontramos ese participante. Puedes registrarlo ahora.",
-            suggested_name=name,
         )
 
+    if not check_password_hash(participant["password_hash"], password):
+        return render_template_string(WELCOME_TEMPLATE, login_error="El PIN no coincide.")
+
+    session["participant_id"] = participant["id"]
+    session["participant_name"] = participant["name"]
+    session["participant_email"] = participant["email"]
     return redirect(url_for("public.ranking"))
 
 
 @public_bp.post("/registro")
 def register():
     name = request.form.get("name", "").strip()
-    if not name:
-        return render_template_string(WELCOME_TEMPLATE, register_error="Introduce tu nombre.")
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    if not name or not email or not password:
+        return render_template_string(WELCOME_TEMPLATE, register_error="Completa nombre, email y PIN.")
+    if len(password) < 4:
+        return render_template_string(WELCOME_TEMPLATE, register_error="El PIN debe tener al menos 4 caracteres.", suggested_name=name)
 
     storage = get_storage()
-    participants = storage.load_participants()
-    if name not in participants:
-        storage.save_participant(name, {"grupos": {}, "eliminatorias": {}})
+    if storage.get_participant_by_email(email):
+        return render_template_string(WELCOME_TEMPLATE, register_error="Ese email ya está registrado.", suggested_name=name)
 
+    password_hash = generate_password_hash(password)
+    storage.create_participant(name, email, password_hash)
+    participant = storage.get_participant_by_email(email)
+    session["participant_id"] = participant["id"]
+    session["participant_name"] = participant["name"]
+    session["participant_email"] = participant["email"]
     return redirect(url_for("public.ranking"))
+
+
+@public_bp.route("/salir")
+def logout():
+    session.clear()
+    return redirect(url_for("public.welcome"))
 
 
 @public_bp.route("/ranking")

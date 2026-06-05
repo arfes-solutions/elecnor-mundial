@@ -14,17 +14,51 @@ def load_participants():
     return participants
 
 
-def save_participant(name, prediction):
+def get_participant_by_email(email):
+    row = get_db().execute(
+        """
+        SELECT id, name, email, password_hash, prediction_json
+        FROM participants
+        WHERE lower(email) = lower(?)
+        """,
+        (email.strip(),),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "email": row["email"],
+        "password_hash": row["password_hash"],
+        "prediction": json.loads(row["prediction_json"]),
+    }
+
+
+def save_participant(name, prediction, email=None, password_hash=None):
     payload = json.dumps(prediction, ensure_ascii=False)
     get_db().execute(
         """
-        INSERT INTO participants (name, prediction_json)
-        VALUES (?, ?)
+        INSERT INTO participants (name, email, password_hash, prediction_json)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(name) DO UPDATE SET
+            email = COALESCE(excluded.email, participants.email),
+            password_hash = COALESCE(excluded.password_hash, participants.password_hash),
             prediction_json = excluded.prediction_json,
             updated_at = CURRENT_TIMESTAMP
         """,
-        (name.strip(), payload),
+        (name.strip(), email.strip().lower() if email else None, password_hash, payload),
+    )
+    get_db().commit()
+
+
+def create_participant(name, email, password_hash):
+    payload = json.dumps({"grupos": {}, "eliminatorias": {}}, ensure_ascii=False)
+    get_db().execute(
+        """
+        INSERT INTO participants (name, email, password_hash, prediction_json)
+        VALUES (?, ?, ?, ?)
+        """,
+        (name.strip(), email.strip().lower(), password_hash, payload),
     )
     get_db().commit()
 

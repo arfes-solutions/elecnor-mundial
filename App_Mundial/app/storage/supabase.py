@@ -26,10 +26,47 @@ def load_participants():
     return {row["name"]: row.get("prediction_json") or {} for row in response.data}
 
 
-def save_participant(name, prediction):
+def get_participant_by_email(email):
+    response = (
+        get_client()
+        .table("participants")
+        .select("id,name,email,password_hash,prediction_json")
+        .ilike("email", email.strip())
+        .limit(1)
+        .execute()
+    )
+    if not response.data:
+        return None
+    row = response.data[0]
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "email": row.get("email"),
+        "password_hash": row.get("password_hash"),
+        "prediction": row.get("prediction_json") or {},
+    }
+
+
+def save_participant(name, prediction, email=None, password_hash=None):
+    payload = {"name": name.strip(), "prediction_json": prediction}
+    if email:
+        payload["email"] = email.strip().lower()
+    if password_hash:
+        payload["password_hash"] = password_hash
     get_client().table("participants").upsert(
-        {"name": name.strip(), "prediction_json": prediction},
+        payload,
         on_conflict="name",
+    ).execute()
+
+
+def create_participant(name, email, password_hash):
+    get_client().table("participants").insert(
+        {
+            "name": name.strip(),
+            "email": email.strip().lower(),
+            "password_hash": password_hash,
+            "prediction_json": {"grupos": {}, "eliminatorias": {}},
+        }
     ).execute()
 
 
