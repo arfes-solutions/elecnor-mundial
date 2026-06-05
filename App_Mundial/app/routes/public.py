@@ -502,4 +502,12 @@ def ranking():
 
 @public_bp.route("/health")
 def health():
-    return {"status": "ok"}
+    from flask import current_app
+    url = current_app.config.get("SUPABASE_URL") or ""
+    key = current_app.config.get("SUPABASE_SERVICE_ROLE_KEY") or ""
+    return {
+        "status": "ok",
+        "supabase_url": url[:40] + "..." if len(url) > 40 else url or "NOT SET",
+        "service_role_key_prefix": key[:12] + "..." if len(key) > 12 else key or "NOT SET",
+        "storage_backend": current_app.config.get("STORAGE_BACKEND"),
+    }
