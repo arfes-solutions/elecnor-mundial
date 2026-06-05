@@ -232,7 +232,7 @@ HTML_TEMPLATE = """
         <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
             <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
                 <h3 class="m-0 fw-bold text-success">Clasificación de Grupos en Directo</h3>
-                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">Clasificación actual</a>
             </div>
             <div class="row">
                 {% for letra, equipos_ordenados in grupos_ordenados.items() %}
@@ -265,7 +265,7 @@ HTML_TEMPLATE = """
         <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
             <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
                 <h3 class="m-0 fw-bold text-success">📅 Partidos del Mundial (Hora Peninsular)</h3>
-                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">Clasificación actual</a>
             </div>
             <div class="row">
                 {% for sec_key, sec in sections.items() %}
@@ -316,7 +316,7 @@ HTML_TEMPLATE = """
         <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
             <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
                 <h3 class="m-0 fw-bold text-success">📅 Horarios del Mundial (Hora Peninsular)</h3>
-                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">Clasificación actual</a>
             </div>
             <div class="row">
                 {% for letra, partidos in calendario.items() %}
@@ -356,7 +356,7 @@ HTML_TEMPLATE = """
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                     <h3 class="m-0 fw-bold text-success">Predicción de {{ nombre }}</h3>
-                    <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+                    <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">Clasificación actual</a>
                 </div>
                 <h5 class="fw-bold text-secondary mb-3">Fase de Grupos</h5>
                 <div class="row g-3 mb-5">
