@@ -460,7 +460,7 @@ ELIM_TEMPLATE = """<!doctype html><html lang="es"><head>
           <div class="teams-grid" id="grid-cuartos"></div>
         </div>
 
-        <!-- 3. SEMIS: de 8 → elige 4 -->
+        <!-- 3. SEMIS -->
         <div class="phase" id="sec-semis">
           <h3>3. Semifinales</h3>
           <p class="sub">De los 8 de cuartos, elige los <strong>4</strong> semifinalistas.</p>
@@ -468,7 +468,7 @@ ELIM_TEMPLATE = """<!doctype html><html lang="es"><head>
           <div class="teams-grid" id="grid-semis"></div>
         </div>
 
-        <!-- 4. FINAL: de 4 → elige 2 -->
+        <!-- 4. FINAL: de 4 semis → elige 2 -->
         <div class="phase" id="sec-final">
           <h3>4. La Final</h3>
           <p class="sub">De los 4 semifinalistas, elige los <strong>2</strong> finalistas.</p>
@@ -538,8 +538,8 @@ function buildGrid(teams, gridId, prefix, nameAttr, sectionId) {
   var sec = document.getElementById(sectionId);
   if (sec) sec.classList.add('active');
 
-  if (nameAttr === 'cuartos') setupPhase('chk-cuartos','grid-semis','sem','semis',4,'cnt-sem','sec-semis');
-  if (nameAttr === 'semis')   setupPhase('chk-semis','grid-final','fin','final',2,'cnt-fin','sec-final');
+  if (nameAttr === 'cuartos') setupPhase('chk-cuartos','grid-semis','sem','semis',8,'cnt-sem','sec-semis');
+  if (nameAttr === 'semis')   setupPhase('chk-semis','grid-final','fin','final',4,'cnt-fin','sec-final');
   if (nameAttr === 'final')   setupPhase('chk-final','grid-campeon','camp','campeon',2,'cnt-fin2','sec-campeon');
   if (nameAttr === 'campeon') {
     Array.from(document.querySelectorAll('.chk-campeon')).forEach(function(r){
