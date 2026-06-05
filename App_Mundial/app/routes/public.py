@@ -1248,6 +1248,27 @@ def admin():
                 except Exception as exc:
                     msg, ok = f"Error al sincronizar: {exc}", False
 
+        elif action == "save_fixture" and authed:
+            try:
+                storage = get_storage()
+                fixtures_list = storage.load_fixtures()
+                idx = int(request.form.get("fixture_idx", -1))
+                if 0 <= idx < len(fixtures_list):
+                    home_score_raw = request.form.get("home_score", "").strip()
+                    away_score_raw = request.form.get("away_score", "").strip()
+                    status = request.form.get("status", "SCHEDULED").strip()
+                    fixtures_list[idx]["home_score"] = int(home_score_raw) if home_score_raw != "" else None
+                    fixtures_list[idx]["away_score"] = int(away_score_raw) if away_score_raw != "" else None
+                    fixtures_list[idx]["status"] = status
+                    fixtures_list[idx]["is_finished"] = (status == "FINISHED")
+                    fixtures_list[idx]["is_live"] = (status == "IN_PLAY")
+                    storage.save_fixtures(fixtures_list)
+                    msg, ok = f"Partido #{idx + 1} actualizado correctamente.", True
+                else:
+                    msg, ok = "Índice de partido inválido.", False
+            except Exception as exc:
+                msg, ok = f"Error al guardar partido: {exc}", False
+
         elif action == "save_results" and authed:
             try:
                 results = {}
@@ -1273,9 +1294,12 @@ def admin():
                 msg, ok = f"Error al guardar: {exc}", False
 
     current_results = {}
+    current_fixtures = []
     if authed:
         try:
-            current_results = get_storage().load_results()
+            storage = get_storage()
+            current_results = storage.load_results()
+            current_fixtures = storage.load_fixtures()
         except Exception:
             pass
 
@@ -1413,6 +1437,80 @@ def admin():
       <button type="submit" class="btn btn-success fw-bold px-5 py-3 fs-5">💾 Guardar resultados</button>
     </div>
   </form>
+
+  <div class="card p-3 mb-5">
+    <h5 class="fw-bold text-success mb-3">⚽ Edición Manual de Partidos</h5>
+    {% if fixtures %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle table-sm">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Fase / Grupo</th>
+            <th class="text-end">Local</th>
+            <th class="text-center">Marcador</th>
+            <th>Visitante</th>
+            <th>Estado</th>
+            <th class="text-center">Guardar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in fixtures %}
+          <tr>
+            <form method="POST">
+              <input type="hidden" name="action" value="save_fixture">
+              <input type="hidden" name="fixture_idx" value="{{ loop.index0 }}">
+              <td class="text-muted small">{{ loop.index }}</td>
+              <td class="small">{{ f.fecha }}</td>
+              <td class="small">{{ f.hora }}</td>
+              <td class="small">
+                {{ f.stage_label }}
+                {% if f.group %}<span class="badge bg-secondary">{{ f.group }}</span>{% endif %}
+              </td>
+              <td class="text-end fw-bold small">
+                {% if f.home.flag %}<img src="https://flagcdn.com/w16/{{ f.home.flag }}.png" width="16" class="me-1">{% endif %}
+                {{ f.home.name }}
+              </td>
+              <td class="text-center">
+                <div class="d-flex align-items-center justify-content-center gap-1">
+                  <input type="number" name="home_score" class="form-control form-control-sm text-center fw-bold"
+                         style="width:55px;" min="0" max="99"
+                         value="{{ f.home_score if f.home_score is not none else '' }}"
+                         placeholder="-">
+                  <span class="fw-bold text-muted">–</span>
+                  <input type="number" name="away_score" class="form-control form-control-sm text-center fw-bold"
+                         style="width:55px;" min="0" max="99"
+                         value="{{ f.away_score if f.away_score is not none else '' }}"
+                         placeholder="-">
+                </div>
+              </td>
+              <td class="fw-bold small">
+                {% if f.away.flag %}<img src="https://flagcdn.com/w16/{{ f.away.flag }}.png" width="16" class="me-1">{% endif %}
+                {{ f.away.name }}
+              </td>
+              <td>
+                <select name="status" class="form-select form-select-sm" style="min-width:120px;">
+                  <option value="SCHEDULED" {{ 'selected' if f.status == 'SCHEDULED' }}>Pendiente</option>
+                  <option value="IN_PLAY" {{ 'selected' if f.status == 'IN_PLAY' }}>En juego</option>
+                  <option value="FINISHED" {{ 'selected' if f.status == 'FINISHED' }}>Finalizado</option>
+                </select>
+              </td>
+              <td class="text-center">
+                <button type="submit" class="btn btn-sm btn-outline-success fw-bold px-3">💾</button>
+              </td>
+            </form>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info mb-0">No hay fixtures cargados. Usa la sincronización API para importarlos.</div>
+    {% endif %}
+  </div>
+
   {% endif %}
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1422,7 +1520,7 @@ def admin():
         ADMIN_HTML,
         authed=True, grupos=grupos_fmt, all_teams=all_teams,
         results=current_results, msg=msg, ok=ok, error=error,
-        has_api_key=has_api_key,
+        has_api_key=has_api_key, fixtures=current_fixtures,
     )
 
 
