@@ -340,21 +340,21 @@ GRUPOS_TEMPLATE = """<!doctype html><html lang="es"><head>
               {% endfor %}
               <div class="selects">
                 <select name="g_{{ letra }}_1" required class="grp-select" data-letra="{{ letra }}">
-                  <option value="" disabled {{ '' if saved.get('g_' ~ letra ~ '_1') else 'selected' }}>1º puesto…</option>
+                  <option value="" disabled {{ '' if saved.get('g_' ~ letra ~ '_1') else 'selected' }}>1º clasificado…</option>
                   {% for tid in team_ids %}
                   <option value="{{ teams[tid].name }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_1') == teams[tid].name }}>{{ teams[tid].name }}</option>
                   {% endfor %}
                 </select>
                 <select name="g_{{ letra }}_2" required class="grp-select" data-letra="{{ letra }}">
-                  <option value="" disabled {{ '' if saved.get('g_' ~ letra ~ '_2') else 'selected' }}>2º puesto…</option>
+                  <option value="" disabled {{ '' if saved.get('g_' ~ letra ~ '_2') else 'selected' }}>2º clasificado…</option>
                   {% for tid in team_ids %}
                   <option value="{{ teams[tid].name }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_2') == teams[tid].name }}>{{ teams[tid].name }}</option>
                   {% endfor %}
                 </select>
                 <select name="g_{{ letra }}_3" class="grp-select tercero" data-letra="{{ letra }}">
-                  <option value="">Ninguno / Eliminado</option>
+                  <option value="">3º · No pasa (eliminado)</option>
                   {% for tid in team_ids %}
-                  <option value="{{ teams[tid].name }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_3') == teams[tid].name }}>{{ teams[tid].name }}</option>
+                  <option value="{{ teams[tid].name }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_3') == teams[tid].name }}>{{ teams[tid].name }} · pasa como mejor 3º</option>
                   {% endfor %}
                 </select>
               </div>
