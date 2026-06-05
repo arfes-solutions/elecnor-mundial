@@ -407,19 +407,21 @@ ELIM_TEMPLATE = """<!doctype html><html lang="es"><head>
 """ + _BASE_STYLE + """
 <style>
   .phase{display:none;padding:22px 0;border-top:1px solid var(--line);}
-  .phase.active{display:block;}
-  .phase h3{margin:0 0 14px;color:var(--pitch-dark);font-size:1.08rem;}
-  .teams-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:9px;}
+  .phase.active{display:block;animation:fadein .3s;}
+  @keyframes fadein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .phase h3{margin:0 0 6px;color:var(--pitch-dark);font-size:1.05rem;}
+  .phase p.sub{margin:0 0 14px;color:var(--muted);font-size:.88rem;}
+  .teams-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px;}
   .chk{display:none;}
   .lbl{display:block;padding:10px 8px;border:2px solid var(--line);border-radius:8px;
-    text-align:center;cursor:pointer;font-weight:750;font-size:.88rem;
-    background:#fff;transition:all .15s;}
+    text-align:center;cursor:pointer;font-weight:750;font-size:.85rem;
+    background:#fff;transition:border-color .12s,background .12s;}
   .chk:checked+.lbl{border-color:var(--pitch);background:#e6f5ee;color:var(--pitch-dark);}
-  .chk:disabled+.lbl{opacity:.45;cursor:not-allowed;}
-  .counter{display:inline-block;padding:5px 12px;border-radius:20px;font-weight:850;
+  .chk:disabled+.lbl{opacity:.4;cursor:not-allowed;}
+  .counter{display:inline-block;padding:5px 13px;border-radius:20px;font-weight:850;
     font-size:.85rem;margin-bottom:14px;background:#fde8e4;color:#8b2215;}
   .counter.ok{background:#d4edda;color:#0f5132;}
-  .pichichi-input{max-width:340px;}
+  .pichichi-wrap{max-width:360px;margin-top:10px;}
   .sticky-btn{position:sticky;bottom:0;background:#fff;border-top:2px solid var(--line);
     padding:16px 20px;text-align:center;}
 </style>
@@ -433,49 +435,64 @@ ELIM_TEMPLATE = """<!doctype html><html lang="es"><head>
     </div>
     <div class="body-pad">
       <form method="post" id="form-elim">
-        <!-- OCTAVOS -->
+
+        <!-- 1. OCTAVOS: 32 clasificados → elige 16 -->
         <div class="phase active" id="sec-octavos">
-          <h3>1. Selecciona 16 equipos para Octavos de Final</h3>
-          <div class="counter" id="cnt-oct">0/16 seleccionados</div>
-          <div class="teams-grid">
+          <h3>1. Octavos de Final</h3>
+          <p class="sub">De los 32 clasificados, elige los <strong>16</strong> que pasan a octavos.</p>
+          <div class="counter" id="cnt-oct">0 / 16 seleccionados</div>
+          <div class="teams-grid" id="grid-octavos">
             {% for eq in clasificados %}
             <span>
-              <input type="checkbox" name="octavos" value="{{ eq }}" id="oct_{{ loop.index }}" class="chk chk-oct">
+              <input type="checkbox" name="octavos" value="{{ eq }}"
+                     id="oct_{{ loop.index }}" class="chk chk-oct">
               <label class="lbl" for="oct_{{ loop.index }}">{{ eq }}</label>
             </span>
             {% endfor %}
           </div>
         </div>
-        <!-- CUARTOS -->
+
+        <!-- 2. CUARTOS: de 16 → elige 8 -->
         <div class="phase" id="sec-cuartos">
-          <h3>2. Selecciona 8 equipos para Cuartos de Final</h3>
-          <div class="counter" id="cnt-cua">0/8 seleccionados</div>
+          <h3>2. Cuartos de Final</h3>
+          <p class="sub">De los 16 de octavos, elige los <strong>8</strong> que pasan a cuartos.</p>
+          <div class="counter" id="cnt-cua">0 / 8 seleccionados</div>
           <div class="teams-grid" id="grid-cuartos"></div>
         </div>
-        <!-- SEMIS -->
+
+        <!-- 3. SEMIS: de 8 → elige 4 -->
         <div class="phase" id="sec-semis">
-          <h3>3. Selecciona 4 equipos para Semifinales</h3>
-          <div class="counter" id="cnt-sem">0/4 seleccionados</div>
+          <h3>3. Semifinales</h3>
+          <p class="sub">De los 8 de cuartos, elige los <strong>4</strong> semifinalistas.</p>
+          <div class="counter" id="cnt-sem">0 / 4 seleccionados</div>
           <div class="teams-grid" id="grid-semis"></div>
         </div>
-        <!-- FINAL -->
+
+        <!-- 4. FINAL: de 4 → elige 2 -->
         <div class="phase" id="sec-final">
-          <h3>4. Selecciona 2 equipos para La Final</h3>
-          <div class="counter" id="cnt-fin">0/2 seleccionados</div>
+          <h3>4. La Final</h3>
+          <p class="sub">De los 4 semifinalistas, elige los <strong>2</strong> finalistas.</p>
+          <div class="counter" id="cnt-fin">0 / 2 seleccionados</div>
           <div class="teams-grid" id="grid-final"></div>
         </div>
-        <!-- CAMPEÓN -->
+
+        <!-- 5. CAMPEÓN + SUBCAMPEÓN + PICHICHI -->
         <div class="phase" id="sec-campeon">
           <h3>5. ¿Quién gana el Mundial?</h3>
+          <p class="sub">Elige al campeón. El otro finalista será el subcampeón automáticamente.</p>
           <div class="teams-grid" id="grid-campeon"></div>
           <input type="hidden" name="subcampeon" id="inp-sub">
-          <h3 style="margin-top:24px;">6. Pichichi (máximo goleador)</h3>
-          <div class="pichichi-input">
+
+          <h3 style="margin-top:26px;">6. Pichichi (máximo goleador)</h3>
+          <p class="sub">Escribe el nombre del jugador que crees que será el máximo goleador.</p>
+          <div class="pichichi-wrap">
             <input type="text" name="pichichi" placeholder="Ej: Kylian Mbappé" required>
           </div>
         </div>
+
         <div class="sticky-btn">
-          <button type="submit" id="btn-fin" class="btn btn-primary" style="display:none;font-size:1.1rem;padding:14px 32px;">
+          <button type="submit" id="btn-fin" class="btn btn-primary"
+                  style="display:none;font-size:1.05rem;padding:14px 32px;">
             🎉 Guardar predicción
           </button>
         </div>
@@ -484,57 +501,71 @@ ELIM_TEMPLATE = """<!doctype html><html lang="es"><head>
   </section>
 </main>
 <script>
-function setupPhase(srcClass,destGrid,destPrefix,nameAttr,max,cntId,nextId){
-  var boxes=document.querySelectorAll('.'+srcClass);
-  boxes.forEach(function(b){
-    b.addEventListener('change',function(){
-      var sel=Array.from(boxes).filter(function(c){return c.checked;}).map(function(c){return c.value;});
-      var cnt=document.getElementById(cntId);
-      cnt.textContent=sel.length+'/'+max+' seleccionados';
-      cnt.className='counter'+(sel.length>=max?' ok':'');
-      if(sel.length>=max){
-        boxes.forEach(function(c){if(!c.checked)c.disabled=true;});
-        buildNext(sel,destGrid,destPrefix,nameAttr,nextId);
-      } else {
-        boxes.forEach(function(c){c.disabled=false;});
-        if(nextId){var ns=document.getElementById(nextId);if(ns)ns.classList.remove('active');}
-        clearFrom(nextId);
-      }
-    });
-  });
+// Generic phase setup: when max checkboxes selected, build next phase
+function setupPhase(srcClass, destGridId, destPrefix, nameAttr, max, cntId, nextSecId) {
+  var boxes = Array.from(document.querySelectorAll('.' + srcClass));
+  function refresh() {
+    var sel = boxes.filter(function(c){return c.checked;}).map(function(c){return c.value;});
+    var cnt = document.getElementById(cntId);
+    cnt.textContent = sel.length + ' / ' + max + ' seleccionados';
+    cnt.className = 'counter' + (sel.length >= max ? ' ok' : '');
+    if (sel.length >= max) {
+      boxes.forEach(function(c){if(!c.checked) c.disabled = true;});
+      buildGrid(sel, destGridId, destPrefix, nameAttr, nextSecId);
+    } else {
+      boxes.forEach(function(c){c.disabled = false;});
+      clearFrom(nextSecId);
+    }
+  }
+  boxes.forEach(function(b){b.addEventListener('change', refresh);});
 }
-function buildNext(teams,gridId,prefix,nameAttr,sectionId){
-  if(!gridId)return;
-  var g=document.getElementById(gridId);
-  if(!g)return;
-  g.innerHTML='';
-  var type=nameAttr==='campeon'?'radio':'checkbox';
-  teams.forEach(function(eq,i){
-    g.innerHTML+='<span><input type="'+type+'" name="'+nameAttr+'" value="'+eq+'" id="'+prefix+'_'+i+'" class="chk chk-'+nameAttr+'"><label class="lbl" for="'+prefix+'_'+i+'">'+eq+'</label></span>';
+
+function buildGrid(teams, gridId, prefix, nameAttr, sectionId) {
+  var grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  var isRadio = (nameAttr === 'campeon');
+  teams.forEach(function(eq, i) {
+    var id = prefix + '_' + i;
+    grid.innerHTML +=
+      '<span>' +
+      '<input type="' + (isRadio ? 'radio' : 'checkbox') + '" ' +
+             'name="' + nameAttr + '" value="' + eq + '" ' +
+             'id="' + id + '" class="chk chk-' + nameAttr + '">' +
+      '<label class="lbl" for="' + id + '">' + eq + '</label>' +
+      '</span>';
   });
-  var sec=document.getElementById(sectionId);
-  if(sec)sec.classList.add('active');
-  if(nameAttr==='cuartos')setupPhase('chk-cuartos','grid-semis','sem','semis',4,'cnt-sem','sec-semis');
-  if(nameAttr==='semis')setupPhase('chk-semis','grid-final','fin','final',2,'cnt-fin','sec-final');
-  if(nameAttr==='final')setupPhase('chk-final','grid-campeon','camp','campeon',2,'cnt-fin2','sec-campeon');
-  if(nameAttr==='campeon'){
-    document.querySelectorAll('.chk-campeon').forEach(function(r){
-      r.addEventListener('change',function(){
-        var finalistas=Array.from(document.querySelectorAll('.chk-final')).filter(function(c){return c.checked;}).map(function(c){return c.value;});
-        document.getElementById('inp-sub').value=finalistas.find(function(f){return f!==r.value;})||'';
-        document.getElementById('btn-fin').style.display='inline-block';
+  var sec = document.getElementById(sectionId);
+  if (sec) sec.classList.add('active');
+
+  if (nameAttr === 'cuartos') setupPhase('chk-cuartos','grid-semis','sem','semis',4,'cnt-sem','sec-semis');
+  if (nameAttr === 'semis')   setupPhase('chk-semis','grid-final','fin','final',2,'cnt-fin','sec-final');
+  if (nameAttr === 'final')   setupPhase('chk-final','grid-campeon','camp','campeon',2,'cnt-fin2','sec-campeon');
+  if (nameAttr === 'campeon') {
+    Array.from(document.querySelectorAll('.chk-campeon')).forEach(function(r){
+      r.addEventListener('change', function(){
+        var finalists = Array.from(document.querySelectorAll('.chk-final'))
+          .filter(function(c){return c.checked;}).map(function(c){return c.value;});
+        document.getElementById('inp-sub').value =
+          finalists.find(function(f){return f !== r.value;}) || '';
+        document.getElementById('btn-fin').style.display = 'inline-block';
       });
     });
   }
 }
-function clearFrom(sectionId){
-  var order=['sec-cuartos','sec-semis','sec-final','sec-campeon'];
-  var idx=order.indexOf(sectionId);
-  if(idx<0)return;
-  for(var i=idx;i<order.length;i++)document.getElementById(order[i]).classList.remove('active');
-  document.getElementById('btn-fin').style.display='none';
+
+function clearFrom(sectionId) {
+  var order = ['sec-cuartos','sec-semis','sec-final','sec-campeon'];
+  var idx = order.indexOf(sectionId);
+  if (idx < 0) return;
+  for (var i = idx; i < order.length; i++) {
+    document.getElementById(order[i]).classList.remove('active');
+  }
+  document.getElementById('btn-fin').style.display = 'none';
 }
-setupPhase('chk-oct','grid-cuartos','cua','cuartos',8,'cnt-oct','sec-cuartos');
+
+// Boot: octavos picks 16 from the 32 classified
+setupPhase('chk-oct', 'grid-cuartos', 'cua', 'cuartos', 16, 'cnt-oct', 'sec-cuartos');
 </script>
 </body></html>
 """
