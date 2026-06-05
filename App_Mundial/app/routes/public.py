@@ -661,6 +661,136 @@ HTML_TEMPLATE = """
             });
         </script>
 
+        {% elif vista == 'prediccion_completa' %}
+        {# ── RESUMEN FASE DE GRUPOS (solo lectura) ── #}
+        <div class="card p-3 mb-4 shadow-sm mx-auto" style="max-width:1400px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-success m-0">✅ Fase de Grupos guardada</h5>
+                <a href="{{ url_for('public.grupos_fase') }}" class="btn btn-sm btn-outline-custom px-3">✏️ Modificar grupos</a>
+            </div>
+            <div class="row g-2">
+                {% for letra, equipos in grupos.items() %}
+                <div class="col-6 col-md-3 col-lg-2">
+                    <div class="card border-0 bg-light h-100">
+                        <div class="card-header bg-success text-white text-center fw-bold py-1 small">Grupo {{ letra }}</div>
+                        <div class="card-body p-2 text-center small">
+                            {% set p1 = saved.get('g_' ~ letra ~ '_1', '—') %}
+                            {% set p2 = saved.get('g_' ~ letra ~ '_2', '—') %}
+                            {% set p3 = saved.get('g_' ~ letra ~ '_3', '') %}
+                            <div class="fw-bold"><span class="text-success">1º</span> {{ p1 }}</div>
+                            <div class="fw-bold"><span class="text-primary">2º</span> {{ p2 }}</div>
+                            {% if p3 %}<div class="text-muted"><span class="text-warning">3º</span> {{ p3 }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# ── FASE ELIMINATORIA ── #}
+        <div class="card p-4 mx-auto shadow-sm" style="max-width:1200px;">
+            <h3 class="fw-bold text-success border-bottom pb-3 text-center">Fase Eliminatoria - {{ nombre }}</h3>
+            <p class="text-center text-muted">Selecciona los equipos que avanzan en cada ronda.</p>
+            <form method="POST" action="{{ url_for('public.eliminatorias_fase') }}" id="form-eliminatorias">
+                <div id="sec-octavos" class="fase-section fase-active mb-5">
+                    <h5 class="bg-success text-white p-2 rounded text-center">1. Selecciona 16 equipos para OCTAVOS DE FINAL</h5>
+                    <div class="text-center mb-3"><span id="count-octavos" class="badge bg-warning text-dark fs-6">0 / 16 seleccionados</span></div>
+                    <div class="row g-2">
+                        {% for equipo in clasificados %}
+                        <div class="col-4 col-md-3 col-lg-2">
+                            <input type="checkbox" name="octavos" value="{{ equipo }}" id="oct_{{ loop.index }}" class="team-checkbox chk-octavos">
+                            <label class="team-label text-truncate" for="oct_{{ loop.index }}">{{ equipo }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="sec-cuartos" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-success text-white p-2 rounded text-center">2. Selecciona 8 equipos para CUARTOS DE FINAL</h5>
+                    <div class="text-center mb-3"><span id="count-cuartos" class="badge bg-warning text-dark fs-6">0 / 8 seleccionados</span></div>
+                    <div class="row g-2" id="grid-cuartos"></div>
+                </div>
+                <div id="sec-semis" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-success text-white p-2 rounded text-center">3. Selecciona 4 equipos para SEMIFINALES</h5>
+                    <div class="text-center mb-3"><span id="count-semis" class="badge bg-warning text-dark fs-6">0 / 4 seleccionados</span></div>
+                    <div class="row g-2" id="grid-semis"></div>
+                </div>
+                <div id="sec-final" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-success text-white p-2 rounded text-center">4. Selecciona 2 equipos para LA FINAL</h5>
+                    <div class="text-center mb-3"><span id="count-final" class="badge bg-warning text-dark fs-6">0 / 2 seleccionados</span></div>
+                    <div class="row g-2 justify-content-center" id="grid-final"></div>
+                </div>
+                <div id="sec-campeon" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-warning text-dark p-2 rounded text-center fw-bold">5. ¡Elige al Campeón Mundial!</h5>
+                    <div class="row g-2 justify-content-center mb-4" id="grid-campeon"></div>
+                    <input type="hidden" name="subcampeon" id="input-subcampeon">
+                    <h5 class="bg-primary text-white p-2 rounded text-center mt-4">6. Pichichi del Torneo (Máximo Goleador)</h5>
+                    <div class="row justify-content-center">
+                        <div class="col-md-6">
+                            <input type="text" name="pichichi" class="form-control form-control-lg text-center" placeholder="Ej: Kylian Mbappé" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-4">
+                    <button type="submit" id="btn-finalizar" class="btn btn-success-custom text-white px-5 py-3 fw-bold fs-4 w-100 d-none">🎉 Terminar Predicción 🎉</button>
+                </div>
+            </form>
+        </div>
+        <script>
+            function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
+                const checkboxes = document.querySelectorAll('.' + origenClase);
+                checkboxes.forEach(chk => {
+                    chk.addEventListener('change', function() {
+                        const selected = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+                        const counter = document.getElementById(counterId);
+                        counter.innerText = selected.length + " / " + maxSelect + " seleccionados";
+                        if (selected.length >= maxSelect) {
+                            counter.className = "badge bg-success fs-6";
+                            checkboxes.forEach(c => { if(!c.checked) c.disabled = true; });
+                            generarSiguienteFase(selected, destinoGrid, destinoPrefijo, nameAttr, nextSectionId);
+                        } else {
+                            counter.className = "badge bg-warning text-dark fs-6";
+                            checkboxes.forEach(c => c.disabled = false);
+                            document.getElementById(nextSectionId).classList.remove('fase-active');
+                            limpiarFasesDesde(nextSectionId);
+                        }
+                    });
+                });
+            }
+            function generarSiguienteFase(equipos, contenedorId, prefijoId, nameAttr, sectionId) {
+                if(!contenedorId) return;
+                const contenedor = document.getElementById(contenedorId);
+                contenedor.innerHTML = '';
+                equipos.forEach((equipo, index) => {
+                    const type = (nameAttr === 'campeon') ? 'radio' : 'checkbox';
+                    contenedor.innerHTML += `<div class="col-6 col-md-3"><input type="${type}" name="${nameAttr}" value="${equipo}" id="${prefijoId}_${index}" class="team-checkbox chk-${nameAttr}"><label class="team-label text-truncate" for="${prefijoId}_${index}">${equipo}</label></div>`;
+                });
+                document.getElementById(sectionId).classList.add('fase-active');
+                if(nameAttr === 'cuartos') setupFase('chk-cuartos', 'grid-semis', 'sem', 8, 'count-cuartos', 'sec-semis', 'semis');
+                if(nameAttr === 'semis') setupFase('chk-semis', 'grid-final', 'fin', 4, 'count-semis', 'sec-final', 'final');
+                if(nameAttr === 'final') setupFase('chk-final', 'grid-campeon', 'camp', 2, 'count-final', 'sec-campeon', 'campeon');
+                if(nameAttr === 'campeon') {
+                    document.querySelectorAll('.chk-campeon').forEach(radio => {
+                        radio.addEventListener('change', function() {
+                            const finalistas = Array.from(document.querySelectorAll('.chk-final')).filter(c=>c.checked).map(c=>c.value);
+                            document.getElementById('input-subcampeon').value = finalistas.find(f => f !== this.value);
+                            document.getElementById('btn-finalizar').classList.remove('d-none');
+                        });
+                    });
+                }
+            }
+            function limpiarFasesDesde(sectionId) {
+                ['sec-cuartos','sec-semis','sec-final','sec-campeon'].forEach((id, i, arr) => {
+                    if(arr.indexOf(sectionId) <= i) document.getElementById(id).classList.remove('fase-active');
+                });
+                document.getElementById('btn-finalizar').classList.add('d-none');
+            }
+            setupFase('chk-octavos', 'grid-cuartos', 'cua', 16, 'count-octavos', 'sec-cuartos', 'cuartos');
+            // Scroll suavemente a la sección de eliminatorias
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('sec-octavos').scrollIntoView({behavior: 'smooth', block: 'start'});
+            });
+        </script>
+
         {% elif vista == 'eliminatorias' %}
         <div class="card p-4 mx-auto shadow-sm" style="max-width:1200px;">
             <h3 class="fw-bold text-success border-bottom pb-3 text-center">Fase Eliminatoria - {{ nombre }}</h3>
@@ -1219,14 +1349,29 @@ def grupos_fase():
     nombre = session.get("pred_nombre", "")
     if not nombre:
         return redirect(url_for("public.nueva_prediccion"))
+
     if request.method == "POST":
-        pred = {"grupos": request.form.to_dict(), "eliminatorias": {}}
-        session["pred_grupos"] = request.form.to_dict()
+        grupos_data = request.form.to_dict()
+        session["pred_grupos"] = grupos_data
+        pred = {"grupos": grupos_data, "eliminatorias": {}}
         try:
             get_storage().save_prediction_by_name(nombre, pred)
         except Exception:
             pass
-        return redirect(url_for("public.eliminatorias_fase"))
+        # Build clasificados for elimination section
+        clasificados = []
+        seen = set()
+        for letra in "ABCDEFGHIJKL":
+            for pos in ("1", "2", "3"):
+                eq = grupos_data.get(f"g_{letra}_{pos}", "")
+                if eq and eq not in seen:
+                    clasificados.append(eq)
+                    seen.add(eq)
+        # Render same page: groups summary (read-only) + elimination form below
+        return _render("prediccion_completa",
+                       grupos=_grupos_fmt(), saved=grupos_data,
+                       nombre=nombre, clasificados=clasificados)
+
     saved = session.get("pred_grupos", {})
     if not saved:
         try:
@@ -1266,20 +1411,8 @@ def eliminatorias_fase():
         session.pop("pred_nombre", None)
         session.pop("pred_grupos", None)
         return redirect(url_for("public.welcome"))
-    grupos_data = session.get("pred_grupos", {})
-    if not grupos_data:
-        return redirect(url_for("public.grupos_fase"))
-    clasificados = []
-    seen = set()
-    for letra in "ABCDEFGHIJKL":
-        for pos in ("1", "2", "3"):
-            eq = grupos_data.get(f"g_{letra}_{pos}", "")
-            if eq and eq not in seen:
-                clasificados.append(eq)
-                seen.add(eq)
-    if not clasificados:
-        return redirect(url_for("public.grupos_fase"))
-    return _render("eliminatorias", nombre=nombre, clasificados=clasificados)
+    # Should not reach here normally, redirect back to grupos
+    return redirect(url_for("public.grupos_fase"))
 
 
 # ---------------------------------------------------------------------------
