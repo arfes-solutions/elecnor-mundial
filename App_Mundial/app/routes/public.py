@@ -804,7 +804,44 @@ def nueva_prediccion():
     return _render("nuevo_nombre")
 
 
+_SYNC_INTERVAL_MINUTES = 30
+
+
+def _auto_sync():
+    """Sync from API at most once every 30 minutes."""
+    from flask import current_app
+    import datetime
+    api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
+    if not api_key:
+        return
+    try:
+        storage = get_storage()
+        # Check last sync time stored in settings table
+        last_sync_str = storage.get_setting("last_sync", "")
+        if last_sync_str:
+            last_sync = datetime.datetime.fromisoformat(last_sync_str)
+            elapsed = (datetime.datetime.utcnow() - last_sync).total_seconds() / 60
+            if elapsed < _SYNC_INTERVAL_MINUTES:
+                return  # Too soon, skip
+
+        from app.services.sync import fetch_all
+        data = fetch_all(api_key)
+        new_results = data.get("results", {})
+        if new_results:
+            existing = storage.load_results()
+            existing.update(new_results)
+            storage.save_results(existing)
+        fixtures = data.get("fixtures", [])
+        if fixtures:
+            storage.save_fixtures(fixtures)
+        # Save timestamp
+        storage.set_setting("last_sync", datetime.datetime.utcnow().isoformat())
+    except Exception:
+        pass  # Never break the page if sync fails
+
+
 def _render_ranking():
+    _auto_sync()
     try:
         storage = get_storage()
         participants = storage.load_participants()
