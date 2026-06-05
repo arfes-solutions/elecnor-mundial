@@ -97,31 +97,28 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="header-banner">
-        <div class="mx-auto" style="max-width:1400px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;">
-            <!-- Izquierda -->
-            <div class="d-flex gap-2">
-                <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
-                <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">Reglas</button>
-            </div>
+        <div class="mx-auto" style="max-width:1400px;">
 
-            <!-- Centro: siempre centrado -->
-            <div class="text-center">
-                <h1>PORRA MUNDIAL 2026</h1>
-                <p>Elecnor Sistemas</p>
-            </div>
-
-            <!-- Derecha: widget + botones -->
-            <div class="d-flex align-items-center gap-2 justify-content-end">
-                {% if live_matches %}
-                    {% set m = live_matches[0] %}
-                    <div class="nav-match-pill live d-none d-md-flex">
+            <!-- DESKTOP: grid 3 columnas -->
+            <div class="d-none d-md-grid" style="display:grid!important;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;">
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
+                    <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">Reglas</button>
+                </div>
+                <div class="text-center">
+                    <h1>PORRA MUNDIAL 2026</h1>
+                    <p>Elecnor Sistemas</p>
+                </div>
+                <div class="d-flex align-items-center gap-2 justify-content-end">
+                    {% if live_matches %}{% set m = live_matches[0] %}
+                    <div class="nav-match-pill live d-flex">
                         <span style="animation:pulse 1s infinite">🔴</span>
                         {% if m.home.flag %}<img src="https://flagcdn.com/w40/{{ m.home.flag }}.png" height="14" style="border-radius:2px;">{% endif %}
                         <strong>{{ m.home_score }}-{{ m.away_score }}</strong>
                         {% if m.away.flag %}<img src="https://flagcdn.com/w40/{{ m.away.flag }}.png" height="14" style="border-radius:2px;">{% endif %}
                     </div>
-                {% elif next_match %}
-                    <div class="nav-match-pill d-none d-md-flex flex-column align-items-center" style="line-height:1.3;">
+                    {% elif next_match %}
+                    <div class="nav-match-pill d-flex flex-column align-items-center" style="line-height:1.3;">
                         <span style="opacity:.75;font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;">Próximo</span>
                         <span style="display:flex;align-items:center;gap:4px;">
                             {% if next_match.home.flag %}<img src="https://flagcdn.com/w40/{{ next_match.home.flag }}.png" height="13" style="border-radius:2px;">{% endif %}
@@ -130,10 +127,51 @@ HTML_TEMPLATE = """
                             · <span id="countdown-nav" style="font-weight:700;">--:--</span>
                         </span>
                     </div>
-                {% endif %}
-                <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
-                <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
+                    {% endif %}
+                    <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
+                    <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
+                </div>
             </div>
+
+            <!-- MOBILE: título + hamburguesa -->
+            <div class="d-flex d-md-none justify-content-between align-items-center">
+                <div class="text-center flex-grow-1">
+                    <h1 style="font-size:1.1rem;margin:0;font-weight:700;">PORRA MUNDIAL 2026</h1>
+                    <p style="font-size:.7rem;margin:0;opacity:.85;">Elecnor Sistemas</p>
+                </div>
+                <button class="btn btn-light text-success fw-bold px-2 py-1" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#mobileMenu" aria-expanded="false">
+                    ☰
+                </button>
+            </div>
+            <!-- MOBILE: menú desplegable -->
+            <div class="collapse d-md-none" id="mobileMenu">
+                <div class="d-flex flex-column gap-2 pt-2">
+                    {% if live_matches %}{% set m = live_matches[0] %}
+                    <div class="nav-match-pill live mx-auto">
+                        <span style="animation:pulse 1s infinite">🔴 EN VIVO</span>
+                        {% if m.home.flag %}<img src="https://flagcdn.com/w40/{{ m.home.flag }}.png" height="13" style="border-radius:2px;">{% endif %}
+                        <strong>{{ m.home_score }}-{{ m.away_score }}</strong>
+                        {% if m.away.flag %}<img src="https://flagcdn.com/w40/{{ m.away.flag }}.png" height="13" style="border-radius:2px;">{% endif %}
+                    </div>
+                    {% elif next_match %}
+                    <div class="text-center text-white small">
+                        ⏱ Próximo:
+                        {% if next_match.home.flag %}<img src="https://flagcdn.com/w40/{{ next_match.home.flag }}.png" height="12" style="border-radius:2px;">{% endif %}
+                        vs
+                        {% if next_match.away.flag %}<img src="https://flagcdn.com/w40/{{ next_match.away.flag }}.png" height="12" style="border-radius:2px;">{% endif %}
+                        · <span id="countdown-nav">--:--</span>
+                    </div>
+                    {% endif %}
+                    <div class="d-flex flex-wrap gap-2 justify-content-center pb-1">
+                        <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
+                        <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">Reglas</button>
+                        <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
+                        <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
