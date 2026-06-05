@@ -1444,11 +1444,11 @@ def eliminatorias_fase():
             pred = p.get("prediction", {}) if p else {"grupos": {}}
             pred["eliminatorias"] = elim
             storage.save_prediction_by_name(nombre, pred)
-        except Exception:
-            pass
-        session.pop("pred_nombre", None)
-        session.pop("pred_grupos", None)
-        return redirect(url_for("public.welcome"))
+            session.pop("pred_nombre", None)
+            session.pop("pred_grupos", None)
+            return redirect(url_for("public.welcome"))
+        except Exception as exc:
+            return f"<h2>Error al guardar eliminatorias</h2><pre>nombre={nombre!r}\nerror={exc}</pre>", 500
     # Should not reach here normally, redirect back to grupos
     return redirect(url_for("public.grupos_fase"))
 
