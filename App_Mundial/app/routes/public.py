@@ -805,12 +805,7 @@ def nueva_prediccion():
 
 
 def _auto_sync():
-    """
-    Sync from API automatically:
-    - Every 2 min if there are live matches right now
-    - Every 5 min during match windows (±2h around any today's fixture)
-    - Every 30 min otherwise
-    """
+    """Sync from API at most once per minute (API free tier: 10 req/min, sync uses 2)."""
     from flask import current_app
     import datetime
     api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
@@ -819,32 +814,11 @@ def _auto_sync():
     try:
         storage = get_storage()
         now_utc = datetime.datetime.utcnow()
-
-        # Determine interval based on current fixtures
-        interval_minutes = 30  # default
-        try:
-            fixtures = storage.load_fixtures()
-            today = now_utc.date()
-            for f in fixtures:
-                if f.get("is_live"):
-                    interval_minutes = 2   # match in progress → very frequent
-                    break
-                # Check if any fixture is today
-                fecha_str = f.get("fecha", "")   # e.g. "11 Jun"
-                status = f.get("status", "")
-                if status == "SCHEDULED" and fecha_str:
-                    interval_minutes = min(interval_minutes, 5)  # match day → every 5 min
-        except Exception:
-            pass
-
-        # Check last sync time
         last_sync_str = storage.get_setting("last_sync", "")
         if last_sync_str:
-            last_sync = datetime.datetime.fromisoformat(last_sync_str)
-            elapsed = (now_utc - last_sync).total_seconds() / 60
-            if elapsed < interval_minutes:
-                return  # Too soon
-
+            elapsed = (now_utc - datetime.datetime.fromisoformat(last_sync_str)).total_seconds()
+            if elapsed < 60:
+                return  # Already synced less than 1 minute ago
         from app.services.sync import fetch_all
         data = fetch_all(api_key)
         new_results = data.get("results", {})
@@ -857,7 +831,7 @@ def _auto_sync():
             storage.save_fixtures(fixtures)
         storage.set_setting("last_sync", now_utc.isoformat())
     except Exception:
-        pass  # Never break the page if sync fails
+        pass
 
 
 def _render_ranking():
