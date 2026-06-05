@@ -1,695 +1,703 @@
 from flask import Blueprint, redirect, render_template_string, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.data.tournament import GROUPS, TEAMS, team_name
+from app.data.tournament import GROUPS, TEAMS
 from app.services.scoring import build_standings
 from app.storage import get_storage
 
 
 public_bp = Blueprint("public", __name__)
 
-# ---------------------------------------------------------------------------
-# Shared CSS / header used by all pages
-# ---------------------------------------------------------------------------
-_BASE_STYLE = """
-<style>
-  :root{--ink:#10251d;--muted:#60756d;--line:#d9e6df;--wash:#eef7f2;--paper:#fff;
-    --pitch:#138455;--pitch-dark:#073f2b;--pitch-deep:#052d21;--gold:#d8b24a;--blue:#215f9f;}
-  *{box-sizing:border-box;}
-  body{margin:0;min-height:100vh;padding-top:96px;color:var(--ink);
-    font-family:Poppins,Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
-    background:linear-gradient(90deg,rgba(7,63,43,.05) 1px,transparent 1px),
-      linear-gradient(180deg,rgba(7,63,43,.05) 1px,transparent 1px),
-      linear-gradient(180deg,#f8fbf9 0%,var(--wash) 58%,#e7f2ec 100%);
-    background-size:64px 64px,64px 64px,auto;}
-  .topbar{position:fixed;top:0;left:0;right:0;z-index:20;display:grid;
-    grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;
-    padding:14px clamp(14px,4vw,48px);color:#fff;
-    background:linear-gradient(120deg,rgba(255,255,255,.08),transparent 34%),
-      linear-gradient(135deg,var(--pitch-deep),var(--pitch));
-    border-radius:0 0 36px 36px;box-shadow:0 14px 32px rgba(7,63,43,.22);}
-  .brand{display:flex;align-items:center;justify-content:center;gap:10px;
-    font-weight:850;text-decoration:none;color:inherit;text-align:center;}
-  .mark{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;
-    background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.34);color:#fff;}
-  .brand small{display:block;color:rgba(255,255,255,.78);font-weight:700;font-size:.78rem;}
-  .nav{display:flex;gap:8px;flex-wrap:wrap;}
-  .nav:last-child{justify-content:flex-end;}
-  .nav a,.btn{border:0;border-radius:8px;padding:10px 18px;background:#fff;
-    color:var(--pitch-dark);font-weight:850;text-decoration:none;
-    box-shadow:0 6px 14px rgba(5,45,33,.14);cursor:pointer;font:inherit;font-size:.92rem;}
-  .btn-primary{background:var(--pitch);color:#fff;}
-  .btn-primary:hover{background:var(--pitch-dark);}
-  .shell{width:min(1200px,calc(100% - 32px));margin:0 auto;padding:28px 0 64px;}
-  .card{overflow:hidden;border:1px solid rgba(16,37,29,.08);border-radius:10px;
-    background:var(--paper);box-shadow:0 20px 56px rgba(7,63,43,.12);}
-  .section-header{padding:26px 30px;color:#fff;
-    background:linear-gradient(135deg,var(--pitch-deep),var(--pitch));}
-  .section-header h1,.section-header h2{margin:0;line-height:1;}
-  .eyebrow{margin:0 0 8px;font-size:.76rem;font-weight:900;letter-spacing:.12em;
-    text-transform:uppercase;opacity:.75;}
-  .body-pad{padding:24px 30px;}
-  .error{color:#a33a2a;font-weight:750;margin:0;}
-  .hint{color:var(--muted);font-size:.9rem;margin:0;}
-  label{color:var(--muted);font-weight:850;font-size:.9rem;}
-  input,select{width:100%;min-height:46px;padding:10px 12px;
-    border:1px solid var(--line);border-radius:8px;color:var(--ink);
-    font:inherit;background:#fbfdfc;}
-  input:focus,select:focus{outline:3px solid rgba(15,107,79,.16);border-color:var(--pitch);}
-  @media(max-width:760px){
-    body{padding-top:112px;}
-    .topbar{grid-template-columns:1fr;}
-    .brand{order:-1;}
-    .nav,.nav:last-child{justify-content:center;}
-  }
-</style>
-"""
-
-def _topbar(show_logout=False):
-    extra = '<a href="' + url_for('public.logout') + '">Salir</a>' if show_logout else ''
-    return f"""
-<header class="topbar">
-  <nav class="nav"><a href="{url_for('public.welcome')}">Inicio</a></nav>
-  <a class="brand" href="{url_for('public.welcome')}">
-    <span class="mark">26</span>
-    <span>PORRA MUNDIAL 2026<small>Elecnor Sistemas</small></span>
-  </a>
-  <nav class="nav"><a href="{url_for('public.ranking')}">Clasificación</a>{extra}</nav>
-</header>"""
-
 
 # ---------------------------------------------------------------------------
-# WELCOME / AUTH
+# Helpers
 # ---------------------------------------------------------------------------
-WELCOME_TEMPLATE = """<!doctype html><html lang="es"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Porra Mundial 2026</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;850;900&display=swap" rel="stylesheet">
-""" + _BASE_STYLE + """
-<style>
-  .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,420px);
-    gap:32px;align-items:stretch;padding:clamp(24px,5vw,52px);
-    background:linear-gradient(90deg,rgba(19,132,85,.07) 1px,transparent 1px),
-      linear-gradient(180deg,#fff 0%,#f6fbf8 100%);
-    background-size:42px 42px,auto;border-bottom:1px solid var(--line);}
-  .copy{display:flex;flex-direction:column;justify-content:center;min-height:300px;}
-  h1{margin:0 0 14px;color:var(--pitch-dark);font-size:clamp(2.4rem,5vw,4.8rem);line-height:.96;}
-  .lead{max-width:640px;margin:0;color:var(--muted);font-size:1.08rem;line-height:1.56;}
-  .flagline{display:flex;flex-wrap:wrap;gap:7px;margin:20px 0 0;}
-  .flagline img{width:32px;height:22px;object-fit:cover;border-radius:3px;
-    box-shadow:0 1px 4px rgba(16,37,29,.18);}
-  .pitch-card{position:relative;min-height:300px;padding:20px;color:#fff;border-radius:8px;
-    overflow:hidden;
-    background:linear-gradient(90deg,rgba(255,255,255,.10) 1px,transparent 1px),
-      linear-gradient(180deg,rgba(255,255,255,.08) 1px,transparent 1px),
-      linear-gradient(135deg,#075136 0%,#138455 58%,#215f9f 100%);
-    background-size:44px 44px,44px 44px,auto;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 20px 40px rgba(7,63,43,.2);}
-  .pitch-card::before{content:"";position:absolute;inset:24px;
-    border:2px solid rgba(255,255,255,.32);border-radius:8px;}
-  .pitch-card::after{content:"";position:absolute;left:50%;top:50%;width:110px;height:110px;
-    transform:translate(-50%,-50%);border:2px solid rgba(255,255,255,.32);border-radius:50%;}
-  .scoreboard{position:relative;z-index:1;display:grid;gap:12px;}
-  .score-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-  .score-top span{padding:6px 9px;border-radius:7px;background:rgba(255,255,255,.14);
-    font-size:.75rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;}
-  .match{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;
-    margin-top:22px;padding:12px;border-radius:8px;
-    background:rgba(5,45,33,.58);backdrop-filter:blur(4px);}
-  .team{display:grid;gap:5px;justify-items:center;font-weight:900;}
-  .team img{width:40px;height:27px;object-fit:cover;border-radius:3px;}
-  .versus{color:var(--gold);font-weight:950;}
-  .groups{position:absolute;z-index:1;left:20px;right:20px;bottom:20px;
-    display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
-  .group-chip{min-height:66px;padding:9px;border-radius:7px;
-    background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.16);}
-  .group-chip strong{display:block;margin-bottom:5px;color:#fff3c4;font-size:.79rem;}
-  .group-chip span{display:block;color:rgba(255,255,255,.8);font-size:.74rem;line-height:1.3;}
-  .auth{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:#fff;}
-  form.auth-form{display:grid;gap:12px;padding:28px;border-right:1px solid var(--line);}
-  form.auth-form.accent{border-right:0;box-shadow:inset 5px 0 0 var(--pitch);}
-  @media(max-width:860px){
-    .hero{grid-template-columns:1fr;}
-    .copy{min-height:auto;}
-    .auth{grid-template-columns:1fr;}
-    form.auth-form,form.auth-form.accent{border-right:0;border-top:1px solid var(--line);}
-    .groups{grid-template-columns:1fr;position:relative;left:auto;right:auto;bottom:auto;margin-top:16px;}
-    .pitch-card{min-height:auto;}
-  }
-</style>
-</head><body>
-{{ topbar | safe }}
-<main class="shell">
-  <section class="card">
-    <div class="hero">
-      <div class="copy">
-        <p class="eyebrow" style="color:var(--pitch)">Elecnor Sistemas</p>
-        <h1>La porra del Mundial empieza aquí</h1>
-        <p class="lead">Regístrate, entra al marcador y compite con tus compañeros durante todo el torneo.</p>
-        <div class="flagline" aria-hidden="true">
-          <img src="https://flagcdn.com/w40/es.png" alt=""><img src="https://flagcdn.com/w40/ar.png" alt="">
-          <img src="https://flagcdn.com/w40/br.png" alt=""><img src="https://flagcdn.com/w40/fr.png" alt="">
-          <img src="https://flagcdn.com/w40/de.png" alt=""><img src="https://flagcdn.com/w40/us.png" alt="">
-          <img src="https://flagcdn.com/w40/mx.png" alt=""><img src="https://flagcdn.com/w40/ca.png" alt="">
-        </div>
-      </div>
-      <aside class="pitch-card">
-        <div class="scoreboard">
-          <div class="score-top"><span>Mundial 2026</span><span>Porra interna</span></div>
-          <div class="match">
-            <div class="team"><img src="https://flagcdn.com/w80/es.png" alt="España"><span>ESP</span></div>
-            <div class="versus">VS</div>
-            <div class="team"><img src="https://flagcdn.com/w80/br.png" alt="Brasil"><span>BRA</span></div>
-          </div>
-        </div>
-        <div class="groups" aria-hidden="true">
-          <div class="group-chip"><strong>Fase de grupos</strong><span>Pronósticos por partido</span></div>
-          <div class="group-chip"><strong>Ranking vivo</strong><span>Puntos y posiciones</span></div>
-          <div class="group-chip"><strong>Final</strong><span>Todos contra todos</span></div>
-        </div>
-      </aside>
-    </div>
-    <div class="auth">
-      <form class="auth-form" method="post" action="{{ url_for('public.login') }}">
-        <div><p class="eyebrow">Acceso</p><h2 style="margin:0;color:var(--pitch-dark)">Ya participo</h2></div>
-        <label for="login-email">Email</label>
-        <input id="login-email" name="email" type="email" autocomplete="email" required>
-        <label for="login-password">PIN o contraseña</label>
-        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
-        {% if login_error %}<p class="error">{{ login_error }}</p>{% endif %}
-        <button class="btn btn-primary" type="submit">Entrar</button>
-      </form>
-      <form class="auth-form accent" method="post" action="{{ url_for('public.register') }}">
-        <div><p class="eyebrow">Registro</p><h2 style="margin:0;color:var(--pitch-dark)">Nuevo participante</h2></div>
-        <label for="reg-name">Nombre</label>
-        <input id="reg-name" name="name" type="text" autocomplete="name" value="{{ suggested_name or '' }}" required>
-        <label for="reg-email">Email</label>
-        <input id="reg-email" name="email" type="email" autocomplete="email" required>
-        <label for="reg-password">PIN (mínimo 4 caracteres)</label>
-        <input id="reg-password" name="password" type="password" minlength="4" autocomplete="new-password" required>
-        {% if register_error %}<p class="error">{{ register_error }}</p>{% endif %}
-        <button class="btn btn-primary" type="submit">Registrarme</button>
-      </form>
-    </div>
-  </section>
-</main></body></html>
-"""
-
-# ---------------------------------------------------------------------------
-# RANKING
-# ---------------------------------------------------------------------------
-RANKING_TEMPLATE = """<!doctype html><html lang="es"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Clasificación – Porra Mundial 2026</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;850;900&display=swap" rel="stylesheet">
-""" + _BASE_STYLE + """
-<style>
-  :root{--silver:#c6d0ca;--bronze:#c97d4d;}
-  ol{display:grid;gap:9px;padding:0;margin:0;list-style:none;}
-  li{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;
-    gap:12px;align-items:center;min-height:64px;padding:10px 14px;
-    border:1px solid var(--line);border-radius:8px;background:#fbfdfc;}
-  li:nth-child(1){border-color:rgba(216,178,74,.55);background:linear-gradient(90deg,rgba(216,178,74,.12),#fff);}
-  li:nth-child(2){border-color:rgba(198,208,202,.75);}
-  li:nth-child(3){border-color:rgba(201,125,77,.45);}
-  .rank{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;
-    background:#e8f2ed;color:var(--pitch);font-weight:950;}
-  li:nth-child(1) .rank{background:var(--gold);color:#2d2206;}
-  li:nth-child(2) .rank{background:var(--silver);color:#23342c;}
-  li:nth-child(3) .rank{background:var(--bronze);color:#fff;}
-  .name strong{display:block;color:var(--pitch-dark);font-size:1rem;}
-  .name span{color:var(--muted);font-size:.85rem;}
-  .points{padding:7px 10px;border-radius:7px;background:#eef7f2;
-    color:var(--pitch-dark);font-weight:950;white-space:nowrap;}
-  .view-link{font-size:.82rem;color:var(--pitch);text-decoration:none;font-weight:750;white-space:nowrap;}
-  .empty{padding:36px 20px;border:1px dashed var(--line);border-radius:8px;
-    color:var(--muted);font-weight:750;text-align:center;}
-  .summary{display:grid;grid-template-columns:repeat(2,minmax(100px,1fr));gap:9px;min-width:230px;}
-  .stat{padding:12px;border-radius:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);}
-  .stat strong{display:block;font-size:1.5rem;}
-  .stat span{color:rgba(255,255,255,.78);font-size:.78rem;font-weight:800;text-transform:uppercase;}
-  .rh{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;
-    align-items:end;padding:28px 30px;color:#fff;
-    background:linear-gradient(90deg,rgba(255,255,255,.10) 1px,transparent 1px),
-      linear-gradient(180deg,rgba(255,255,255,.08) 1px,transparent 1px),
-      linear-gradient(135deg,#073f2b 0%,#138455 68%,#215f9f 100%);
-    background-size:46px 46px,46px 46px,auto;}
-  .cta-bar{padding:18px 30px;background:#f3faf6;border-top:1px solid var(--line);
-    display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-  @media(max-width:720px){
-    li{grid-template-columns:38px minmax(0,1fr) auto;}
-    .view-link{display:none;}
-    .rh{grid-template-columns:1fr;}
-    .summary{min-width:0;}
-  }
-</style>
-</head><body>
-{{ topbar | safe }}
-<main class="shell">
-  <section class="card">
-    <div class="rh">
-      <div><p class="eyebrow">Clasificación</p><h1>Ranking general</h1></div>
-      <div class="summary">
-        <div class="stat"><strong>{{ standings|length }}</strong><span>Participantes</span></div>
-        <div class="stat"><strong>2026</strong><span>Mundial</span></div>
-      </div>
-    </div>
-    {% if current_user and not has_prediction %}
-    <div class="cta-bar">
-      <span style="color:var(--muted);font-weight:750;">Aún no has hecho tu predicción.</span>
-      <a class="btn btn-primary" href="{{ url_for('public.grupos_fase') }}">Hacer mi predicción →</a>
-    </div>
-    {% elif current_user %}
-    <div class="cta-bar">
-      <a class="btn" href="{{ url_for('public.grupos_fase') }}" style="font-size:.88rem;">Editar predicción</a>
-      <a class="btn" href="{{ url_for('public.ver_prediccion', participant_id=session.get('participant_id')) }}" style="font-size:.88rem;">Ver mi predicción</a>
-    </div>
-    {% endif %}
-    <div class="body-pad">
-      {% if standings %}
-      <ol>
-        {% for row in standings %}
-        <li>
-          <span class="rank">{{ loop.index }}</span>
-          <span class="name"><strong>{{ row.name }}</strong><span>Participante Elecnor</span></span>
-          <span class="points">{{ row.points }} pts</span>
-          <a class="view-link" href="{{ url_for('public.ver_prediccion', participant_id=row.id) }}">Ver predicción</a>
-        </li>
-        {% endfor %}
-      </ol>
-      {% else %}
-      <div class="empty">Todavía no hay participantes. ¡Sé el primero en registrarte!</div>
-      {% endif %}
-    </div>
-  </section>
-</main></body></html>
-"""
-
-# ---------------------------------------------------------------------------
-# GRUPOS PREDICTION FORM
-# ---------------------------------------------------------------------------
-GRUPOS_TEMPLATE = """<!doctype html><html lang="es"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fase de Grupos – Porra Mundial 2026</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;850;900&display=swap" rel="stylesheet">
-""" + _BASE_STYLE + """
-<style>
-  .info-card{background:#f0faf5;border:1px solid #b2dcc6;border-radius:9px;padding:18px 22px;margin-bottom:22px;}
-  .info-card p{margin:4px 0;color:var(--muted);font-size:.92rem;}
-  .groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
-  .group-card{border:1px solid var(--line);border-radius:9px;overflow:hidden;}
-  .group-card-header{background:var(--pitch);color:#fff;padding:10px 14px;font-weight:850;font-size:1rem;}
-  .group-card-body{background:#f8fbf9;padding:12px;}
-  .team-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e8f0eb;font-size:.88rem;font-weight:700;}
-  .team-row:last-child{border-bottom:0;}
-  .team-row img{width:22px;height:15px;object-fit:cover;border-radius:2px;}
-  .selects{display:grid;gap:8px;margin-top:10px;}
-  select{min-height:40px;font-size:.88rem;}
-  .counter-bar{position:sticky;bottom:0;background:#fff;border-top:2px solid var(--line);
-    padding:16px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;}
-  .badge{display:inline-block;padding:6px 14px;border-radius:20px;font-weight:850;font-size:.88rem;}
-  .badge-ok{background:#d4edda;color:#0f5132;}
-  .badge-fail{background:#fde8e4;color:#8b2215;}
-</style>
-</head><body>
-{{ topbar | safe }}
-<main class="shell">
-  <section class="card">
-    <div class="section-header">
-      <p class="eyebrow">Paso 1 de 2</p>
-      <h2>Fase de Grupos</h2>
-    </div>
-    <div class="body-pad">
-      <div class="info-card">
-        <p><strong>Selecciona el 1º y 2º</strong> de cada grupo (obligatorio).</p>
-        <p>Elige exactamente <strong>8 mejores terceros</strong> en total (los que pasan de la fase de grupos).</p>
-      </div>
-      <form method="post" id="form-grupos">
-        <div class="groups-grid">
-          {% for letra, team_ids in groups.items() %}
-          <div class="group-card">
-            <div class="group-card-header">Grupo {{ letra }}</div>
-            <div class="group-card-body">
-              {% for tid in team_ids %}
-              {% set t = teams[tid] %}
-              <div class="team-row">
-                <img src="https://flagcdn.com/w40/{{ t.flag }}.png" alt="{{ t.name }}">
-                {{ t.name }}
-              </div>
-              {% endfor %}
-              <div class="selects">
-                <select name="g_{{ letra }}_1" required class="grp-select" data-letra="{{ letra }}">
-                  <option value="" disabled {{ '' if saved.get('g_' ~ letra ~ '_1') else 'selected' }}>1º clasificado…</option>
-                  {% for tid in team_ids %}
-                  <option value="{{ teams[tid].name }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_1') == teams[tid].name }}>{{ teams[tid].name }}</option>
-                  {% endfor %}
-                </select>
-                <select name="g_{{ letra }}_2" required class="grp-select" data-letra="{{ letra }}">
-                  <option value="" disabled {{ '' if saved.get('g_' ~ letra ~ '_2') else 'selected' }}>2º clasificado…</option>
-                  {% for tid in team_ids %}
-                  <option value="{{ teams[tid].name }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_2') == teams[tid].name }}>{{ teams[tid].name }}</option>
-                  {% endfor %}
-                </select>
-                <select name="g_{{ letra }}_3" class="grp-select tercero" data-letra="{{ letra }}">
-                  <option value="">3º · No pasa (eliminado)</option>
-                  {% for tid in team_ids %}
-                  <option value="{{ teams[tid].name }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_3') == teams[tid].name }}>{{ teams[tid].name }} · pasa como mejor 3º</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-        <div class="counter-bar">
-          <span id="badge-grupos" class="badge badge-fail">Grupos: 0/12</span>
-          <span id="badge-terceros" class="badge badge-fail">Mejores terceros: 0/8</span>
-          <button type="submit" id="btn-sig" class="btn btn-primary" disabled>Continuar a eliminatorias →</button>
-        </div>
-      </form>
-    </div>
-  </section>
-</main>
-<script>
-function validate(){
-  var letras=['A','B','C','D','E','F','G','H','I','J','K','L'];
-  var g=0,t=0;
-  letras.forEach(function(l){
-    var s1=document.querySelector('[name="g_'+l+'_1"]');
-    var s2=document.querySelector('[name="g_'+l+'_2"]');
-    var s3=document.querySelector('[name="g_'+l+'_3"]');
-    if(s1&&s1.value&&s2&&s2.value)g++;
-    if(s3&&s3.value)t++;
-  });
-  var bg=document.getElementById('badge-grupos');
-  var bt=document.getElementById('badge-terceros');
-  var btn=document.getElementById('btn-sig');
-  bg.textContent='Grupos: '+g+'/12';
-  bg.className='badge '+(g===12?'badge-ok':'badge-fail');
-  bt.textContent='Mejores terceros: '+t+'/8';
-  bt.className='badge '+(t===8?'badge-ok':'badge-fail');
-  btn.disabled=!(g===12&&t===8);
-}
-document.querySelectorAll('select').forEach(function(s){s.addEventListener('change',validate);});
-validate();
-</script>
-</body></html>
-"""
-
-# ---------------------------------------------------------------------------
-# ELIMINATORIAS FORM
-# ---------------------------------------------------------------------------
-ELIM_TEMPLATE = """<!doctype html><html lang="es"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Eliminatorias – Porra Mundial 2026</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;850;900&display=swap" rel="stylesheet">
-""" + _BASE_STYLE + """
-<style>
-  .phase{display:none;padding:22px 0;border-top:1px solid var(--line);}
-  .phase.active{display:block;animation:fadein .3s;}
-  @keyframes fadein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-  .phase h3{margin:0 0 6px;color:var(--pitch-dark);font-size:1.05rem;}
-  .phase p.sub{margin:0 0 14px;color:var(--muted);font-size:.88rem;}
-  .teams-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px;}
-  .chk{display:none;}
-  .lbl{display:block;padding:10px 8px;border:2px solid var(--line);border-radius:8px;
-    text-align:center;cursor:pointer;font-weight:750;font-size:.85rem;
-    background:#fff;transition:border-color .12s,background .12s;}
-  .chk:checked+.lbl{border-color:var(--pitch);background:#e6f5ee;color:var(--pitch-dark);}
-  .chk:disabled+.lbl{opacity:.4;cursor:not-allowed;}
-  .counter{display:inline-block;padding:5px 13px;border-radius:20px;font-weight:850;
-    font-size:.85rem;margin-bottom:14px;background:#fde8e4;color:#8b2215;}
-  .counter.ok{background:#d4edda;color:#0f5132;}
-  .pichichi-wrap{max-width:360px;margin-top:10px;}
-  .sticky-btn{position:sticky;bottom:0;background:#fff;border-top:2px solid var(--line);
-    padding:16px 20px;text-align:center;}
-</style>
-</head><body>
-{{ topbar | safe }}
-<main class="shell">
-  <section class="card">
-    <div class="section-header">
-      <p class="eyebrow">Paso 2 de 2</p>
-      <h2>Fase Eliminatoria</h2>
-    </div>
-    <div class="body-pad">
-      <form method="post" id="form-elim">
-
-        <!-- 1. OCTAVOS: 32 clasificados → elige 16 -->
-        <div class="phase active" id="sec-octavos">
-          <h3>1. Octavos de Final</h3>
-          <p class="sub">De los 32 clasificados, elige los <strong>16</strong> que pasan a octavos.</p>
-          <div class="counter" id="cnt-oct">0 / 16 seleccionados</div>
-          <div class="teams-grid" id="grid-octavos">
-            {% for eq in clasificados %}
-            <span>
-              <input type="checkbox" name="octavos" value="{{ eq }}"
-                     id="oct_{{ loop.index }}" class="chk chk-oct">
-              <label class="lbl" for="oct_{{ loop.index }}">{{ eq }}</label>
-            </span>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- 2. CUARTOS: de 16 → elige 8 -->
-        <div class="phase" id="sec-cuartos">
-          <h3>2. Cuartos de Final</h3>
-          <p class="sub">De los 16 de octavos, elige los <strong>8</strong> que pasan a cuartos.</p>
-          <div class="counter" id="cnt-cua">0 / 8 seleccionados</div>
-          <div class="teams-grid" id="grid-cuartos"></div>
-        </div>
-
-        <!-- 3. SEMIS -->
-        <div class="phase" id="sec-semis">
-          <h3>3. Semifinales</h3>
-          <p class="sub">De los 8 de cuartos, elige los <strong>4</strong> semifinalistas.</p>
-          <div class="counter" id="cnt-sem">0 / 4 seleccionados</div>
-          <div class="teams-grid" id="grid-semis"></div>
-        </div>
-
-        <!-- 4. FINAL: de 4 semis → elige 2 -->
-        <div class="phase" id="sec-final">
-          <h3>4. La Final</h3>
-          <p class="sub">De los 4 semifinalistas, elige los <strong>2</strong> finalistas.</p>
-          <div class="counter" id="cnt-fin">0 / 2 seleccionados</div>
-          <div class="teams-grid" id="grid-final"></div>
-        </div>
-
-        <!-- 5. CAMPEÓN + SUBCAMPEÓN + PICHICHI -->
-        <div class="phase" id="sec-campeon">
-          <h3>5. ¿Quién gana el Mundial?</h3>
-          <p class="sub">Elige al campeón. El otro finalista será el subcampeón automáticamente.</p>
-          <div class="teams-grid" id="grid-campeon"></div>
-          <input type="hidden" name="subcampeon" id="inp-sub">
-
-          <h3 style="margin-top:26px;">6. Pichichi (máximo goleador)</h3>
-          <p class="sub">Escribe el nombre del jugador que crees que será el máximo goleador.</p>
-          <div class="pichichi-wrap">
-            <input type="text" name="pichichi" placeholder="Ej: Kylian Mbappé" required>
-          </div>
-        </div>
-
-        <div class="sticky-btn">
-          <button type="submit" id="btn-fin" class="btn btn-primary"
-                  style="display:none;font-size:1.05rem;padding:14px 32px;">
-            🎉 Guardar predicción
-          </button>
-        </div>
-      </form>
-    </div>
-  </section>
-</main>
-<script>
-// Generic phase setup: when max checkboxes selected, build next phase
-function setupPhase(srcClass, destGridId, destPrefix, nameAttr, max, cntId, nextSecId) {
-  var boxes = Array.from(document.querySelectorAll('.' + srcClass));
-  function refresh() {
-    var sel = boxes.filter(function(c){return c.checked;}).map(function(c){return c.value;});
-    var cnt = document.getElementById(cntId);
-    cnt.textContent = sel.length + ' / ' + max + ' seleccionados';
-    cnt.className = 'counter' + (sel.length >= max ? ' ok' : '');
-    if (sel.length >= max) {
-      boxes.forEach(function(c){if(!c.checked) c.disabled = true;});
-      buildGrid(sel, destGridId, destPrefix, nameAttr, nextSecId);
-    } else {
-      boxes.forEach(function(c){c.disabled = false;});
-      clearFrom(nextSecId);
+def _grupos_fmt():
+    """Convert GROUPS/TEAMS to the original {letra: [(iso, name)]} format."""
+    return {
+        letra: [(TEAMS[tid]["flag"], TEAMS[tid]["name"]) for tid in team_ids]
+        for letra, team_ids in GROUPS.items()
     }
-  }
-  boxes.forEach(function(b){b.addEventListener('change', refresh);});
-}
-
-function buildGrid(teams, gridId, prefix, nameAttr, sectionId) {
-  var grid = document.getElementById(gridId);
-  if (!grid) return;
-  grid.innerHTML = '';
-  var isRadio = (nameAttr === 'campeon');
-  teams.forEach(function(eq, i) {
-    var id = prefix + '_' + i;
-    grid.innerHTML +=
-      '<span>' +
-      '<input type="' + (isRadio ? 'radio' : 'checkbox') + '" ' +
-             'name="' + nameAttr + '" value="' + eq + '" ' +
-             'id="' + id + '" class="chk chk-' + nameAttr + '">' +
-      '<label class="lbl" for="' + id + '">' + eq + '</label>' +
-      '</span>';
-  });
-  var sec = document.getElementById(sectionId);
-  if (sec) sec.classList.add('active');
-
-  if (nameAttr === 'cuartos') setupPhase('chk-cuartos','grid-semis','sem','semis',8,'cnt-cua','sec-semis');
-  if (nameAttr === 'semis')   setupPhase('chk-semis','grid-final','fin','final',4,'cnt-sem','sec-final');
-  if (nameAttr === 'final')   setupPhase('chk-final','grid-campeon','camp','campeon',2,'cnt-fin','sec-campeon');
-  if (nameAttr === 'campeon') {
-    Array.from(document.querySelectorAll('.chk-campeon')).forEach(function(r){
-      r.addEventListener('change', function(){
-        var finalists = Array.from(document.querySelectorAll('.chk-final'))
-          .filter(function(c){return c.checked;}).map(function(c){return c.value;});
-        document.getElementById('inp-sub').value =
-          finalists.find(function(f){return f !== r.value;}) || '';
-        document.getElementById('btn-fin').style.display = 'inline-block';
-      });
-    });
-  }
-}
-
-function clearFrom(sectionId) {
-  var order = ['sec-cuartos','sec-semis','sec-final','sec-campeon'];
-  var idx = order.indexOf(sectionId);
-  if (idx < 0) return;
-  for (var i = idx; i < order.length; i++) {
-    document.getElementById(order[i]).classList.remove('active');
-  }
-  document.getElementById('btn-fin').style.display = 'none';
-}
-
-// Boot: octavos picks 16 from the 32 classified
-setupPhase('chk-oct', 'grid-cuartos', 'cua', 'cuartos', 16, 'cnt-oct', 'sec-cuartos');
-</script>
-</body></html>
-"""
-
-# ---------------------------------------------------------------------------
-# VER PREDICCIÓN
-# ---------------------------------------------------------------------------
-VER_TEMPLATE = """<!doctype html><html lang="es"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Predicción – Porra Mundial 2026</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;850;900&display=swap" rel="stylesheet">
-""" + _BASE_STYLE + """
-<style>
-  .groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:32px;}
-  .gcard{border:1px solid var(--line);border-radius:8px;overflow:hidden;}
-  .gcard-hd{background:var(--pitch);color:#fff;padding:8px 12px;font-weight:850;font-size:.88rem;}
-  .gcard-bd{padding:10px 12px;}
-  .pos{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:.88rem;font-weight:700;}
-  .pos-1{color:var(--pitch);}
-  .pos-2{color:var(--blue);}
-  .pos-3{color:#c97d4d;}
-  .rounds{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-bottom:28px;}
-  .round-block h4{margin:0 0 10px;color:var(--pitch-dark);}
-  .tags{display:flex;flex-wrap:wrap;gap:6px;}
-  .tag{padding:5px 10px;border-radius:6px;border:1px solid var(--line);
-    font-size:.82rem;font-weight:750;background:#f8fbf9;}
-  .finale{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
-    background:#f3faf6;border-radius:10px;padding:22px;text-align:center;}
-  .finale-block small{display:block;color:var(--muted);font-weight:850;font-size:.76rem;
-    text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
-  .finale-block strong{font-size:1.1rem;color:var(--pitch-dark);}
-  .finale-block.champion strong{font-size:1.35rem;color:var(--pitch);}
-</style>
-</head><body>
-{{ topbar | safe }}
-<main class="shell">
-  <section class="card">
-    <div class="section-header">
-      <p class="eyebrow">Predicción de</p>
-      <h2>{{ name }}</h2>
-    </div>
-    <div class="body-pad">
-      <h3 style="color:var(--pitch-dark);margin:0 0 14px">Fase de Grupos</h3>
-      <div class="groups-grid">
-        {% for letra in 'ABCDEFGHIJKL' %}
-        {% set p1 = pred_grupos.get('g_' ~ letra ~ '_1','—') %}
-        {% set p2 = pred_grupos.get('g_' ~ letra ~ '_2','—') %}
-        {% set p3 = pred_grupos.get('g_' ~ letra ~ '_3','') %}
-        <div class="gcard">
-          <div class="gcard-hd">Grupo {{ letra }}</div>
-          <div class="gcard-bd">
-            <div class="pos pos-1">1º {{ p1 }}</div>
-            <div class="pos pos-2">2º {{ p2 }}</div>
-            {% if p3 %}<div class="pos pos-3">3º {{ p3 }}</div>{% endif %}
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-
-      <h3 style="color:var(--pitch-dark);margin:0 0 14px">Fase Eliminatoria</h3>
-      <div class="rounds">
-        {% for ronda, label in [('octavos','Octavos'),('cuartos','Cuartos'),('semis','Semifinales'),('final','Final')] %}
-        {% set equipos = pred_elim.get(ronda,[]) %}
-        {% if equipos %}
-        <div class="round-block">
-          <h4>{{ label }}</h4>
-          <div class="tags">
-            {% for eq in equipos %}<span class="tag">{{ eq }}</span>{% endfor %}
-          </div>
-        </div>
-        {% endif %}
-        {% endfor %}
-      </div>
-
-      <div class="finale">
-        <div class="finale-block">
-          <small>Subcampeón</small>
-          <strong>{{ pred_elim.get('subcampeon','—') }}</strong>
-        </div>
-        <div class="finale-block champion">
-          <small>🏆 Campeón Mundial</small>
-          <strong>{{ pred_elim.get('campeon','—') }}</strong>
-        </div>
-        <div class="finale-block">
-          <small>⚽ Pichichi</small>
-          <strong>{{ pred_elim.get('pichichi','—') }}</strong>
-        </div>
-      </div>
-    </div>
-  </section>
-</main></body></html>
-"""
 
 
-# ---------------------------------------------------------------------------
-# HELPERS
-# ---------------------------------------------------------------------------
 def _logged_in():
     return bool(session.get("participant_id"))
 
 def _require_login():
     return redirect(url_for("public.welcome"))
 
-def _render_welcome(**kwargs):
-    return render_template_string(WELCOME_TEMPLATE, topbar=_topbar(), **kwargs)
 
-def _render_ranking(standings):
-    uid = session.get("participant_id")
-    has_pred = False
-    if uid:
-        try:
-            p = get_storage().get_participant_by_id(uid)
-            pred = p.get("prediction", {}) if p else {}
-            has_pred = bool(pred.get("grupos") or pred.get("eliminatorias"))
-        except Exception:
-            pass
+# ---------------------------------------------------------------------------
+# ORIGINAL HTML TEMPLATE (from legacy_app.py, adapted url_for + auth views)
+# ---------------------------------------------------------------------------
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porra Mundial 2026 · Elecnor Sistemas</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏆</text></svg>">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f2f9f5; color: #2c3e50; padding-top: 110px; }
+        .header-banner {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1050;
+            background: linear-gradient(135deg, #0f5132 0%, #198754 100%);
+            color: white; padding: 1rem 1.5rem;
+            border-radius: 0 0 40px 40px;
+            box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
+        }
+        .header-banner h1 { font-size: clamp(1.2rem, 3vw, 1.6rem); font-weight: 700; letter-spacing: 1px; text-shadow: 1px 1px 3px rgba(0,0,0,0.2); margin: 0; }
+        .header-banner p { font-size: clamp(0.7rem, 1.5vw, 0.9rem); font-weight: 400; margin: 0; opacity: 0.9; }
+        .card { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: none; background-color: rgba(255,255,255,0.98); }
+        .table-custom-header { background-color: #0f5132 !important; color: white !important; }
+        .puntos-oro { color: #d4af37; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        .btn-success-custom { background-color: #198754; border: none; border-radius: 8px; transition: all 0.3s ease; }
+        .btn-success-custom:hover:not(:disabled) { background-color: #146c43; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(25,135,84,0.3); }
+        .btn-success-custom:disabled { opacity: 0.5; cursor: not-allowed; background-color: #6c757d; }
+        .btn-outline-custom { color: #0f5132; border-color: #0f5132; border-radius: 8px; }
+        .btn-outline-custom:hover { background-color: #0f5132; color: white; }
+        select option { font-weight: bold; color: #2c3e50; }
+        select option:disabled { font-weight: normal; color: #adb5bd; font-style: italic; }
+        .team-checkbox { display: none; }
+        .team-label { cursor: pointer; border: 2px solid #dee2e6; border-radius: 8px; padding: 10px; transition: all 0.2s; display: block; text-align: center; background: white; font-weight: 600; }
+        .team-checkbox:checked + .team-label { border-color: #198754; background-color: #e8f5e9; color: #0f5132; box-shadow: 0 4px 8px rgba(25,135,84,0.2); transform: scale(1.02); }
+        .team-checkbox:disabled + .team-label { opacity: 0.5; cursor: not-allowed; }
+        .fase-section { display: none; }
+        .fase-active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="header-banner">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mx-auto gap-2" style="max-width: 1400px;">
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
+                <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">
+                    Reglas
+                </button>
+            </div>
+            <div class="text-center flex-grow-1 d-none d-md-block">
+                <h1>PORRA MUNDIAL 2026</h1>
+                <p>Elecnor Sistemas</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
+                <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
+                {% if current_user %}
+                <a href="{{ url_for('public.logout') }}" class="btn btn-outline-light fw-bold px-3">Salir</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-4 mb-5">
+
+        {% if vista == 'inicio' %}
+        <div class="card p-2 p-md-4 mx-auto" style="max-width: 1200px;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                    <h3 class="card-title m-0 fw-bold text-success">Clasificación General</h3>
+                    {% if not current_user %}
+                        <a href="{{ url_for('public.welcome') }}" class="btn btn-success-custom text-white fw-bold px-4 py-2">➕ Participar</a>
+                    {% elif not has_prediction %}
+                        <a href="{{ url_for('public.grupos_fase') }}" class="btn btn-success-custom text-white fw-bold px-4 py-2">📝 Hacer mi predicción</a>
+                    {% else %}
+                        <a href="{{ url_for('public.grupos_fase') }}" class="btn btn-outline-custom fw-bold px-4 py-2">✏️ Editar predicción</a>
+                    {% endif %}
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-custom-header">
+                            <tr>
+                                <th scope="col" class="py-3 rounded-start-2">Pos</th>
+                                <th scope="col" class="py-3">Nombre</th>
+                                <th scope="col" class="text-center py-3">Puntos</th>
+                                <th scope="col" class="text-end py-3 rounded-end-2">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for jug in clasificacion %}
+                            <tr>
+                                <td class="fw-bold fs-5">{{ loop.index }}º</td>
+                                <td class="fw-bold fs-5">{{ jug.name }}</td>
+                                <td class="text-center fw-bold fs-4 puntos-oro">{{ jug.points }} pts</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('public.ver_prediccion', participant_id=jug.id) }}" class="btn btn-sm btn-outline-custom px-3">Ver predicción</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center py-5 text-muted fs-5">El campo está vacío. ¡Sé el primero en participar! ⚽</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {% elif vista == 'login_register' %}
+        <div class="row justify-content-center g-4 mt-2">
+            <div class="col-md-5">
+                <div class="card p-4">
+                    <h4 class="fw-bold text-success border-bottom pb-3 mb-4 text-center">Ya tengo cuenta</h4>
+                    {% if login_error %}
+                    <div class="alert alert-danger py-2">{{ login_error }}</div>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('public.login') }}">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-success">Email</label>
+                            <input type="email" name="email" class="form-control border-success" required autocomplete="email">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-success">PIN o contraseña</label>
+                            <input type="password" name="password" class="form-control border-success" required autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Entrar →</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="card p-4 border-success border-2">
+                    <h4 class="fw-bold text-success border-bottom pb-3 mb-4 text-center">Nuevo participante</h4>
+                    {% if register_error %}
+                    <div class="alert alert-danger py-2">{{ register_error }}</div>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('public.register') }}">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-success">Nombre</label>
+                            <input type="text" name="name" class="form-control border-success" required value="{{ suggested_name or '' }}" autocomplete="name">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-success">Email</label>
+                            <input type="email" name="email" class="form-control border-success" required autocomplete="email">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-success">PIN (mínimo 4 caracteres)</label>
+                            <input type="password" name="password" class="form-control border-success" minlength="4" required autocomplete="new-password">
+                        </div>
+                        <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Registrarme ➕</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {% elif vista == 'ver_grupos' %}
+        <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
+                <h3 class="m-0 fw-bold text-success">Clasificación de Grupos en Directo</h3>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+            </div>
+            <div class="row">
+                {% for letra, equipos_ordenados in grupos_ordenados.items() %}
+                <div class="col-md-6 col-lg-3 mb-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-header bg-success text-white fw-bold text-center py-2">Grupo {{ letra }}</div>
+                        <div class="card-body p-2">
+                            <div class="d-flex flex-column gap-2">
+                                {% for iso, pais, puesto in equipos_ordenados %}
+                                <div class="bg-white border rounded px-2 py-2 shadow-sm d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img src="https://flagcdn.com/w20/{{ iso }}.png" width="20" alt="{{ pais }}">
+                                        <span class="fw-semibold text-dark small">{{ pais }}</span>
+                                    </div>
+                                    {% if puesto == '1º' %}<span class="badge bg-success shadow-sm">{{ puesto }}</span>
+                                    {% elif puesto == '2º' %}<span class="badge bg-primary shadow-sm">{{ puesto }}</span>
+                                    {% elif puesto == '3º' %}<span class="badge bg-warning text-dark shadow-sm">{{ puesto }}</span>
+                                    {% else %}<span class="badge bg-secondary opacity-25">-</span>{% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% elif vista == 'ver_horarios' %}
+        <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
+                <h3 class="m-0 fw-bold text-success">📅 Horarios del Mundial (Hora Peninsular)</h3>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+            </div>
+            <div class="row">
+                {% for letra, partidos in calendario.items() %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm border-0 bg-light">
+                        <div class="card-header bg-success text-white fw-bold text-center py-2">Grupo {{ letra }}</div>
+                        <div class="card-body p-3">
+                            <div class="d-flex flex-column gap-3">
+                                {% for p in partidos %}
+                                <div class="bg-white border rounded p-2 shadow-sm">
+                                    <div class="text-center text-muted small mb-2 fw-bold border-bottom pb-1">
+                                        <span class="text-success">{{ p.jornada }}</span> • {{ p.fecha }} - {{ p.hora }}
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="text-end" style="width:40%;font-size:0.9rem;">
+                                            <span class="fw-bold">{{ p.eq1[1] }}</span>
+                                            <img src="https://flagcdn.com/w20/{{ p.eq1[0] }}.png" width="20" alt="{{ p.eq1[1] }}" class="ms-1">
+                                        </div>
+                                        <div class="text-center fw-bold text-secondary" style="width:20%;">vs</div>
+                                        <div class="text-start" style="width:40%;font-size:0.9rem;">
+                                            <img src="https://flagcdn.com/w20/{{ p.eq2[0] }}.png" width="20" alt="{{ p.eq2[1] }}" class="me-1">
+                                            <span class="fw-bold">{{ p.eq2[1] }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% elif vista == 'ver_prediccion' %}
+        <div class="card p-3 p-md-4 mx-auto" style="max-width: 1200px;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <h3 class="m-0 fw-bold text-success">Predicción de {{ nombre }}</h3>
+                    <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+                </div>
+                <h5 class="fw-bold text-secondary mb-3">Fase de Grupos</h5>
+                <div class="row g-3 mb-5">
+                    {% for letra in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
+                        {% set p1 = predicciones.get('grupos',{}).get('g_' ~ letra ~ '_1', '') %}
+                        {% set p2 = predicciones.get('grupos',{}).get('g_' ~ letra ~ '_2', '') %}
+                        {% set p3 = predicciones.get('grupos',{}).get('g_' ~ letra ~ '_3', '') %}
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <div class="card shadow-sm h-100 border-0 bg-light">
+                                <div class="card-header bg-success text-white text-center fw-bold py-2">Grupo {{ letra }}</div>
+                                <div class="card-body p-2 text-center small">
+                                    <div class="fw-bold text-dark mb-1"><span class="text-success me-1">1º</span> {{ p1 or '—' }}</div>
+                                    <div class="fw-bold text-dark mb-1"><span class="text-primary me-1">2º</span> {{ p2 or '—' }}</div>
+                                    {% if p3 %}<div class="fw-bold text-muted"><span class="text-warning me-1">3º</span> {{ p3 }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <h5 class="fw-bold text-secondary mb-3 border-top pt-4">Rondas Finales</h5>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">Octavos de Final</h6>
+                        <div class="d-flex flex-wrap justify-content-center gap-1">
+                            {% for eq in predicciones.get('eliminatorias',{}).get('octavos', []) %}
+                                <span class="badge bg-white text-dark border border-secondary p-2">{{ eq }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">Cuartos de Final</h6>
+                        <div class="d-flex flex-wrap justify-content-center gap-1">
+                            {% for eq in predicciones.get('eliminatorias',{}).get('cuartos', []) %}
+                                <span class="badge bg-white text-dark border border-secondary p-2">{{ eq }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">Semifinales</h6>
+                        <div class="d-flex flex-wrap justify-content-center gap-2">
+                            {% for eq in predicciones.get('eliminatorias',{}).get('semis', []) %}
+                                <span class="badge bg-white text-dark border border-secondary p-2 fs-6">{{ eq }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">La Final</h6>
+                        <div class="d-flex flex-wrap justify-content-center gap-3">
+                            {% for eq in predicciones.get('eliminatorias',{}).get('final', []) %}
+                                <span class="badge bg-white text-dark border border-success p-2 fs-5">{{ eq }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-5 justify-content-center text-center bg-light p-4 rounded-4 shadow-sm mx-1">
+                    <div class="col-md-4 mb-3 mb-md-0 border-end border-2">
+                        <h6 class="text-muted fw-bold mb-2">SUBCAMPEÓN</h6>
+                        <h4 class="fw-bold text-secondary m-0">{{ predicciones.get('eliminatorias',{}).get('subcampeon', '-') }}</h4>
+                    </div>
+                    <div class="col-md-4 mb-3 mb-md-0 border-end border-2">
+                        <h6 class="text-warning fw-bold mb-2">🏆 CAMPEÓN MUNDIAL</h6>
+                        <h3 class="fw-bold text-success m-0">{{ predicciones.get('eliminatorias',{}).get('campeon', '-') }}</h3>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-primary fw-bold mb-2">⚽ PICHICHI</h6>
+                        <h4 class="fw-bold text-dark m-0">{{ predicciones.get('eliminatorias',{}).get('pichichi', '-') }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% elif vista == 'fase_grupos' %}
+        <div class="card p-3 mb-4 shadow-sm border-start border-success border-4 mx-auto" style="max-width:1200px;background-color:#fff;">
+            <h5 class="fw-bold text-success mb-2">📋 Reglas de Clasificación de la Fase de Grupos</h5>
+            <p class="text-muted small mb-2">
+                En el Mundial 2026, se clasifican para dieciseisavos de final los dos primeros equipos de cada grupo y además los 8 mejores terceros clasificados en general.<br>Por tanto:
+            </p>
+            <ul class="text-muted small" style="line-height:1.6;">
+                <li>Debes seleccionar obligatoriamente el <strong>1º y 2º puesto</strong> de cada uno de los 12 grupos.</li>
+                <li>Debes elegir exactamente a <strong>8 equipos como mejores terceros</strong> en total.</li>
+            </ul>
+            <p class="text-muted small mb-0">El botón para avanzar al final de la página se habilitará automáticamente cuando completes todos los requisitos.</p>
+        </div>
+
+        <form method="POST" class="mx-auto" style="max-width:1400px;">
+            <div class="row">
+                {% for letra, equipos in grupos.items() %}
+                <div class="col-md-6 col-lg-3 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-success text-white fw-bold text-center fs-5">Grupo {{ letra }}</div>
+                        <div class="card-body bg-light p-3">
+                            <div class="d-flex flex-column gap-1 mb-3">
+                                {% for iso, pais in equipos %}
+                                <div class="bg-white border rounded px-2 py-1 shadow-sm d-flex align-items-center gap-2">
+                                    <img src="https://flagcdn.com/w20/{{ iso }}.png" width="20" alt="{{ pais }}">
+                                    <span class="fw-semibold text-dark small">{{ pais }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <hr class="my-2">
+                            <div class="mb-2">
+                                <label class="form-label text-muted small fw-bold mb-1">1º Puesto <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm fw-bold border-secondary text-secondary" name="g_{{ letra }}_1" required>
+                                    <option value="" disabled selected hidden>Elegir 1º...</option>
+                                    {% for iso, pais in equipos %}
+                                    <option value="{{ pais }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_1') == pais }}>{{ pais }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label text-muted small fw-bold mb-1">2º Puesto <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm fw-bold border-secondary text-secondary" name="g_{{ letra }}_2" required>
+                                    <option value="" disabled selected hidden>Elegir 2º...</option>
+                                    {% for iso, pais in equipos %}
+                                    <option value="{{ pais }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_2') == pais }}>{{ pais }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label text-muted small fw-bold mb-1">Mejor 3º (Opcional)</label>
+                                <select class="form-select form-select-sm border-secondary text-secondary select-tercero" name="g_{{ letra }}_3">
+                                    <option value="">Ninguno / Eliminado</option>
+                                    {% for iso, pais in equipos %}
+                                    <option value="{{ pais }}" {{ 'selected' if saved.get('g_' ~ letra ~ '_3') == pais }}>{{ pais }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="card p-4 mt-2 shadow-sm text-center mx-auto mb-5" style="max-width:1200px;">
+                <div class="mb-3 d-flex justify-content-center gap-3 flex-wrap">
+                    <span id="counter-grupos" class="badge bg-danger fs-6 p-2">Grupos: 0 / 12 completados</span>
+                    <span id="terceros-counter" class="badge bg-danger fs-6 p-2">Mejores Terceros: 0 / 8 elegidos</span>
+                </div>
+                <button type="submit" id="btn-siguiente" class="btn btn-success-custom text-white px-5 py-3 fw-bold fs-5 mx-auto" disabled>Continuar</button>
+            </div>
+        </form>
+
+        <script>
+            function validarFormulario() {
+                let gruposCompletos = 0, tercerosContados = 0;
+                const letras = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+                letras.forEach(letra => {
+                    const s1 = document.querySelector('select[name="g_' + letra + '_1"]');
+                    const s2 = document.querySelector('select[name="g_' + letra + '_2"]');
+                    const s3 = document.querySelector('select[name="g_' + letra + '_3"]');
+                    const selects = [s1, s2, s3];
+                    for (let i = 0; i < selects.length; i++) {
+                        for (let j = 0; j < selects[i].options.length; j++) {
+                            let opt = selects[i].options[j];
+                            if (opt.value === "") continue;
+                            let isDisabled = false;
+                            for (let k = 0; k < selects.length; k++) {
+                                if (i !== k && selects[k].value === opt.value) { isDisabled = true; break; }
+                            }
+                            opt.disabled = isDisabled;
+                        }
+                    }
+                    if (s1.value !== "" && s2.value !== "") gruposCompletos++;
+                    if (s3 && s3.value !== "") tercerosContados++;
+                });
+                const btnSubmit = document.getElementById('btn-siguiente');
+                const lblGrupos = document.getElementById('counter-grupos');
+                const lblTerceros = document.getElementById('terceros-counter');
+                lblGrupos.innerText = "Grupos: " + gruposCompletos + " / 12 completados";
+                lblGrupos.className = (gruposCompletos === 12) ? "badge bg-success fs-6 p-2" : "badge bg-danger fs-6 p-2";
+                lblTerceros.innerText = "Mejores Terceros: " + tercerosContados + " / 8 elegidos";
+                lblTerceros.className = (tercerosContados === 8) ? "badge bg-success fs-6 p-2" : "badge bg-danger fs-6 p-2";
+                btnSubmit.disabled = !(gruposCompletos === 12 && tercerosContados === 8);
+            }
+            document.addEventListener("DOMContentLoaded", function() {
+                document.querySelectorAll("select").forEach(s => s.addEventListener("change", validarFormulario));
+                validarFormulario();
+            });
+        </script>
+
+        {% elif vista == 'eliminatorias' %}
+        <div class="card p-4 mx-auto shadow-sm" style="max-width:1200px;">
+            <h3 class="fw-bold text-success border-bottom pb-3 text-center">Fase Eliminatoria - {{ nombre }}</h3>
+            <p class="text-center text-muted">Selecciona los equipos que avanzan en cada ronda.</p>
+            <form method="POST" id="form-eliminatorias">
+                <div id="sec-octavos" class="fase-section fase-active mb-5">
+                    <h5 class="bg-success text-white p-2 rounded text-center">1. Selecciona 16 equipos para OCTAVOS DE FINAL</h5>
+                    <div class="text-center mb-3"><span id="count-octavos" class="badge bg-warning text-dark fs-6">0 / 16 seleccionados</span></div>
+                    <div class="row g-2">
+                        {% for equipo in clasificados %}
+                        <div class="col-4 col-md-3 col-lg-2">
+                            <input type="checkbox" name="octavos" value="{{ equipo }}" id="oct_{{ loop.index }}" class="team-checkbox chk-octavos">
+                            <label class="team-label text-truncate" for="oct_{{ loop.index }}">{{ equipo }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="sec-cuartos" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-success text-white p-2 rounded text-center">2. Selecciona 8 equipos para CUARTOS DE FINAL</h5>
+                    <div class="text-center mb-3"><span id="count-cuartos" class="badge bg-warning text-dark fs-6">0 / 8 seleccionados</span></div>
+                    <div class="row g-2" id="grid-cuartos"></div>
+                </div>
+                <div id="sec-semis" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-success text-white p-2 rounded text-center">3. Selecciona 4 equipos para SEMIFINALES</h5>
+                    <div class="text-center mb-3"><span id="count-semis" class="badge bg-warning text-dark fs-6">0 / 4 seleccionados</span></div>
+                    <div class="row g-2" id="grid-semis"></div>
+                </div>
+                <div id="sec-final" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-success text-white p-2 rounded text-center">4. Selecciona 2 equipos para LA FINAL</h5>
+                    <div class="text-center mb-3"><span id="count-final" class="badge bg-warning text-dark fs-6">0 / 2 seleccionados</span></div>
+                    <div class="row g-2 justify-content-center" id="grid-final"></div>
+                </div>
+                <div id="sec-campeon" class="fase-section mb-5 border-top pt-4">
+                    <h5 class="bg-warning text-dark p-2 rounded text-center fw-bold">5. ¡Elige al Campeón Mundial!</h5>
+                    <div class="row g-2 justify-content-center mb-4" id="grid-campeon"></div>
+                    <input type="hidden" name="subcampeon" id="input-subcampeon">
+                    <h5 class="bg-primary text-white p-2 rounded text-center mt-4">6. Pichichi del Torneo (Máximo Goleador)</h5>
+                    <div class="row justify-content-center">
+                        <div class="col-md-6">
+                            <input type="text" name="pichichi" class="form-control form-control-lg text-center" placeholder="Ej: Kylian Mbappé" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-4">
+                    <button type="submit" id="btn-finalizar" class="btn btn-success-custom text-white px-5 py-3 fw-bold fs-4 w-100 d-none">🎉 Terminar Predicción 🎉</button>
+                </div>
+            </form>
+        </div>
+
+        <script>
+            function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
+                const checkboxes = document.querySelectorAll('.' + origenClase);
+                checkboxes.forEach(chk => {
+                    chk.addEventListener('change', function() {
+                        const selected = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+                        const counter = document.getElementById(counterId);
+                        counter.innerText = selected.length + " / " + maxSelect + " seleccionados";
+                        if (selected.length >= maxSelect) {
+                            counter.className = "badge bg-success fs-6";
+                            checkboxes.forEach(c => { if(!c.checked) c.disabled = true; });
+                            generarSiguienteFase(selected, destinoGrid, destinoPrefijo, nameAttr, nextSectionId);
+                        } else {
+                            counter.className = "badge bg-warning text-dark fs-6";
+                            checkboxes.forEach(c => c.disabled = false);
+                            document.getElementById(nextSectionId).classList.remove('fase-active');
+                            limpiarFasesDesde(nextSectionId);
+                        }
+                    });
+                });
+            }
+            function generarSiguienteFase(equipos, contenedorId, prefijoId, nameAttr, sectionId) {
+                if(!contenedorId) return;
+                const contenedor = document.getElementById(contenedorId);
+                contenedor.innerHTML = '';
+                equipos.forEach((equipo, index) => {
+                    const type = (nameAttr === 'campeon') ? 'radio' : 'checkbox';
+                    contenedor.innerHTML += `
+                        <div class="col-6 col-md-3">
+                            <input type="${type}" name="${nameAttr}" value="${equipo}" id="${prefijoId}_${index}" class="team-checkbox chk-${nameAttr}">
+                            <label class="team-label text-truncate" for="${prefijoId}_${index}">${equipo}</label>
+                        </div>`;
+                });
+                document.getElementById(sectionId).classList.add('fase-active');
+                if(nameAttr === 'cuartos') setupFase('chk-cuartos', 'grid-semis', 'sem', 8, 'count-cuartos', 'sec-semis', 'semis');
+                if(nameAttr === 'semis') setupFase('chk-semis', 'grid-final', 'fin', 4, 'count-semis', 'sec-final', 'final');
+                if(nameAttr === 'final') setupFase('chk-final', 'grid-campeon', 'camp', 2, 'count-final', 'sec-campeon', 'campeon');
+                if(nameAttr === 'campeon') {
+                    document.querySelectorAll('.chk-campeon').forEach(radio => {
+                        radio.addEventListener('change', function() {
+                            const finalistas = Array.from(document.querySelectorAll('.chk-final')).filter(c=>c.checked).map(c=>c.value);
+                            const sub = finalistas.find(f => f !== this.value);
+                            document.getElementById('input-subcampeon').value = sub;
+                            document.getElementById('btn-finalizar').classList.remove('d-none');
+                        });
+                    });
+                }
+            }
+            function limpiarFasesDesde(sectionId) {
+                const fases = ['sec-cuartos', 'sec-semis', 'sec-final', 'sec-campeon'];
+                const index = fases.indexOf(sectionId);
+                if(index !== -1) { for(let i = index; i < fases.length; i++) document.getElementById(fases[i]).classList.remove('fase-active'); }
+                document.getElementById('btn-finalizar').classList.add('d-none');
+            }
+            setupFase('chk-octavos', 'grid-cuartos', 'cua', 16, 'count-octavos', 'sec-cuartos', 'cuartos');
+        </script>
+
+        {% endif %}
+    </div>
+
+    <!-- MODAL REGLAS -->
+    <div class="modal fade" id="modalReglas" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">📋 Reglas y Puntuaciones</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-dark">
+                    <h6 class="fw-bold text-success border-bottom pb-2 mb-3">🌍 Sistema de Clasificación (Mundial 2026)</h6>
+                    <p class="small text-muted mb-4">
+                        En esta edición compiten 48 selecciones repartidas en 12 grupos. Se clasifican para la ronda de <strong>Dieciseisavos de Final (32 equipos en total):</strong><br>
+                        - Los <strong>2 primeros</strong> equipos de cada grupo.<br>
+                        - Los <strong>8 mejores terceros</strong> en el cómputo global.
+                    </p>
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">🔢 Sistema de Puntuación de la Porra</h6>
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">Fase de Grupos (acertar que un equipo se clasifica)<span class="badge bg-secondary rounded-pill">+1 pt</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">Fase de Grupos (acertar también su posición exacta)<span class="badge bg-secondary rounded-pill">+1 pt extra</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">Acertar cada equipo en Octavos de Final<span class="badge bg-primary rounded-pill">+3 pts</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">Acertar cada equipo en Cuartos de Final<span class="badge bg-primary rounded-pill">+5 pts</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">Acertar cada equipo en Semifinales<span class="badge bg-primary rounded-pill">+8 pts</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">Acertar cada equipo en La Final<span class="badge bg-primary rounded-pill">+12 pts</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-light mt-2 fw-bold text-secondary">Acertar el Subcampeón<span class="badge bg-warning text-dark rounded-pill">+10 pts</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-light fw-bold text-success">🏆 Acertar el Campeón Mundial<span class="badge bg-success rounded-pill">+20 pts</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-light fw-bold text-dark">⚽ Acertar el Pichichi (Máximo Goleador)<span class="badge bg-dark rounded-pill">+7 pts</span></li>
+                    </ul>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
+
+
+def _render(vista, **kwargs):
     return render_template_string(
-        RANKING_TEMPLATE,
-        topbar=_topbar(show_logout=_logged_in()),
-        standings=standings,
+        HTML_TEMPLATE,
+        vista=vista,
         current_user=session.get("participant_name"),
-        has_prediction=has_pred,
-        session=session,
+        **kwargs,
     )
+
+
+def _generar_calendario():
+    return {
+        'A': [
+            {'jornada':'Jornada 1','eq1':('mx','México'),'eq2':('za','Sudáfrica'),'fecha':'11 Jun','hora':'21:00'},
+            {'jornada':'Jornada 1','eq1':('kr','Corea del Sur'),'eq2':('cz','Chequia'),'fecha':'12 Jun','hora':'04:00'},
+            {'jornada':'Jornada 2','eq1':('cz','Chequia'),'eq2':('za','Sudáfrica'),'fecha':'18 Jun','hora':'18:00'},
+            {'jornada':'Jornada 2','eq1':('mx','México'),'eq2':('kr','Corea del Sur'),'fecha':'19 Jun','hora':'03:00'},
+            {'jornada':'Jornada 3','eq1':('za','Sudáfrica'),'eq2':('kr','Corea del Sur'),'fecha':'25 Jun','hora':'03:00'},
+            {'jornada':'Jornada 3','eq1':('cz','Chequia'),'eq2':('mx','México'),'fecha':'25 Jun','hora':'03:00'},
+        ],
+        'B': [
+            {'jornada':'Jornada 1','eq1':('ca','Canadá'),'eq2':('ba','Bosnia y Herzegovina'),'fecha':'12 Jun','hora':'21:00'},
+            {'jornada':'Jornada 1','eq1':('qa','Qatar'),'eq2':('ch','Suiza'),'fecha':'13 Jun','hora':'21:00'},
+            {'jornada':'Jornada 2','eq1':('ch','Suiza'),'eq2':('ba','Bosnia y Herzegovina'),'fecha':'18 Jun','hora':'21:00'},
+            {'jornada':'Jornada 2','eq1':('ca','Canadá'),'eq2':('qa','Qatar'),'fecha':'19 Jun','hora':'00:00'},
+            {'jornada':'Jornada 3','eq1':('ba','Bosnia y Herzegovina'),'eq2':('qa','Qatar'),'fecha':'24 Jun','hora':'21:00'},
+            {'jornada':'Jornada 3','eq1':('ch','Suiza'),'eq2':('ca','Canadá'),'fecha':'24 Jun','hora':'21:00'},
+        ],
+        'C': [
+            {'jornada':'Jornada 1','eq1':('br','Brasil'),'eq2':('ma','Marruecos'),'fecha':'14 Jun','hora':'00:00'},
+            {'jornada':'Jornada 1','eq1':('ht','Haití'),'eq2':('gb-sct','Escocia'),'fecha':'14 Jun','hora':'03:00'},
+            {'jornada':'Jornada 2','eq1':('gb-sct','Escocia'),'eq2':('ma','Marruecos'),'fecha':'20 Jun','hora':'00:00'},
+            {'jornada':'Jornada 2','eq1':('br','Brasil'),'eq2':('ht','Haití'),'fecha':'20 Jun','hora':'02:30'},
+            {'jornada':'Jornada 3','eq1':('gb-sct','Escocia'),'eq2':('br','Brasil'),'fecha':'25 Jun','hora':'00:00'},
+            {'jornada':'Jornada 3','eq1':('ma','Marruecos'),'eq2':('ht','Haití'),'fecha':'25 Jun','hora':'00:00'},
+        ],
+        'D': [
+            {'jornada':'Jornada 1','eq1':('us','Estados Unidos'),'eq2':('py','Paraguay'),'fecha':'13 Jun','hora':'03:00'},
+            {'jornada':'Jornada 1','eq1':('au','Australia'),'eq2':('tr','Turquía'),'fecha':'14 Jun','hora':'06:00'},
+            {'jornada':'Jornada 2','eq1':('us','Estados Unidos'),'eq2':('au','Australia'),'fecha':'19 Jun','hora':'21:00'},
+            {'jornada':'Jornada 2','eq1':('tr','Turquía'),'eq2':('py','Paraguay'),'fecha':'20 Jun','hora':'05:00'},
+            {'jornada':'Jornada 3','eq1':('tr','Turquía'),'eq2':('us','Estados Unidos'),'fecha':'26 Jun','hora':'04:00'},
+            {'jornada':'Jornada 3','eq1':('py','Paraguay'),'eq2':('au','Australia'),'fecha':'26 Jun','hora':'04:00'},
+        ],
+        'E': [
+            {'jornada':'Jornada 1','eq1':('de','Alemania'),'eq2':('cw','Curazao'),'fecha':'14 Jun','hora':'19:00'},
+            {'jornada':'Jornada 1','eq1':('ci','Costa de Marfil'),'eq2':('ec','Ecuador'),'fecha':'15 Jun','hora':'01:00'},
+            {'jornada':'Jornada 2','eq1':('de','Alemania'),'eq2':('ci','Costa de Marfil'),'fecha':'20 Jun','hora':'22:00'},
+            {'jornada':'Jornada 2','eq1':('ec','Ecuador'),'eq2':('cw','Curazao'),'fecha':'21 Jun','hora':'02:00'},
+            {'jornada':'Jornada 3','eq1':('ec','Ecuador'),'eq2':('de','Alemania'),'fecha':'25 Jun','hora':'22:00'},
+            {'jornada':'Jornada 3','eq1':('cw','Curazao'),'eq2':('ci','Costa de Marfil'),'fecha':'25 Jun','hora':'22:00'},
+        ],
+        'F': [
+            {'jornada':'Jornada 1','eq1':('nl','Países Bajos'),'eq2':('jp','Japón'),'fecha':'14 Jun','hora':'22:00'},
+            {'jornada':'Jornada 1','eq1':('se','Suecia'),'eq2':('tn','Túnez'),'fecha':'15 Jun','hora':'04:00'},
+            {'jornada':'Jornada 2','eq1':('nl','Países Bajos'),'eq2':('se','Suecia'),'fecha':'20 Jun','hora':'19:00'},
+            {'jornada':'Jornada 2','eq1':('tn','Túnez'),'eq2':('jp','Japón'),'fecha':'21 Jun','hora':'06:00'},
+            {'jornada':'Jornada 3','eq1':('jp','Japón'),'eq2':('se','Suecia'),'fecha':'26 Jun','hora':'01:00'},
+            {'jornada':'Jornada 3','eq1':('tn','Túnez'),'eq2':('nl','Países Bajos'),'fecha':'26 Jun','hora':'01:00'},
+        ],
+        'G': [
+            {'jornada':'Jornada 1','eq1':('be','Bélgica'),'eq2':('eg','Egipto'),'fecha':'15 Jun','hora':'21:00'},
+            {'jornada':'Jornada 1','eq1':('ir','Irán'),'eq2':('nz','Nueva Zelanda'),'fecha':'16 Jun','hora':'03:00'},
+            {'jornada':'Jornada 2','eq1':('be','Bélgica'),'eq2':('ir','Irán'),'fecha':'21 Jun','hora':'21:00'},
+            {'jornada':'Jornada 2','eq1':('nz','Nueva Zelanda'),'eq2':('eg','Egipto'),'fecha':'22 Jun','hora':'03:00'},
+            {'jornada':'Jornada 3','eq1':('nz','Nueva Zelanda'),'eq2':('be','Bélgica'),'fecha':'27 Jun','hora':'05:00'},
+            {'jornada':'Jornada 3','eq1':('eg','Egipto'),'eq2':('ir','Irán'),'fecha':'27 Jun','hora':'05:00'},
+        ],
+        'H': [
+            {'jornada':'Jornada 1','eq1':('es','España'),'eq2':('cv','Cabo Verde'),'fecha':'15 Jun','hora':'18:00'},
+            {'jornada':'Jornada 1','eq1':('sa','Arabia Saudita'),'eq2':('uy','Uruguay'),'fecha':'16 Jun','hora':'00:00'},
+            {'jornada':'Jornada 2','eq1':('es','España'),'eq2':('sa','Arabia Saudita'),'fecha':'21 Jun','hora':'18:00'},
+            {'jornada':'Jornada 2','eq1':('uy','Uruguay'),'eq2':('cv','Cabo Verde'),'fecha':'22 Jun','hora':'00:00'},
+            {'jornada':'Jornada 3','eq1':('uy','Uruguay'),'eq2':('es','España'),'fecha':'27 Jun','hora':'02:00'},
+            {'jornada':'Jornada 3','eq1':('cv','Cabo Verde'),'eq2':('sa','Arabia Saudita'),'fecha':'27 Jun','hora':'02:00'},
+        ],
+        'I': [
+            {'jornada':'Jornada 1','eq1':('fr','Francia'),'eq2':('sn','Senegal'),'fecha':'16 Jun','hora':'21:00'},
+            {'jornada':'Jornada 1','eq1':('iq','Irak'),'eq2':('no','Noruega'),'fecha':'17 Jun','hora':'00:00'},
+            {'jornada':'Jornada 2','eq1':('fr','Francia'),'eq2':('iq','Irak'),'fecha':'22 Jun','hora':'23:00'},
+            {'jornada':'Jornada 2','eq1':('no','Noruega'),'eq2':('sn','Senegal'),'fecha':'23 Jun','hora':'02:00'},
+            {'jornada':'Jornada 3','eq1':('sn','Senegal'),'eq2':('iq','Irak'),'fecha':'26 Jun','hora':'21:00'},
+            {'jornada':'Jornada 3','eq1':('no','Noruega'),'eq2':('fr','Francia'),'fecha':'26 Jun','hora':'21:00'},
+        ],
+        'J': [
+            {'jornada':'Jornada 1','eq1':('ar','Argentina'),'eq2':('dz','Argelia'),'fecha':'17 Jun','hora':'03:00'},
+            {'jornada':'Jornada 1','eq1':('at','Austria'),'eq2':('jo','Jordania'),'fecha':'17 Jun','hora':'06:00'},
+            {'jornada':'Jornada 2','eq1':('ar','Argentina'),'eq2':('at','Austria'),'fecha':'22 Jun','hora':'19:00'},
+            {'jornada':'Jornada 2','eq1':('jo','Jordania'),'eq2':('dz','Argelia'),'fecha':'23 Jun','hora':'05:00'},
+            {'jornada':'Jornada 3','eq1':('jo','Jordania'),'eq2':('ar','Argentina'),'fecha':'28 Jun','hora':'04:00'},
+            {'jornada':'Jornada 3','eq1':('dz','Argelia'),'eq2':('at','Austria'),'fecha':'28 Jun','hora':'04:00'},
+        ],
+        'K': [
+            {'jornada':'Jornada 1','eq1':('pt','Portugal'),'eq2':('cd','RD Congo'),'fecha':'17 Jun','hora':'19:00'},
+            {'jornada':'Jornada 1','eq1':('uz','Uzbekistán'),'eq2':('co','Colombia'),'fecha':'18 Jun','hora':'04:00'},
+            {'jornada':'Jornada 2','eq1':('pt','Portugal'),'eq2':('uz','Uzbekistán'),'fecha':'23 Jun','hora':'19:00'},
+            {'jornada':'Jornada 2','eq1':('co','Colombia'),'eq2':('cd','RD Congo'),'fecha':'24 Jun','hora':'04:00'},
+            {'jornada':'Jornada 3','eq1':('co','Colombia'),'eq2':('pt','Portugal'),'fecha':'28 Jun','hora':'01:30'},
+            {'jornada':'Jornada 3','eq1':('cd','RD Congo'),'eq2':('uz','Uzbekistán'),'fecha':'28 Jun','hora':'01:30'},
+        ],
+        'L': [
+            {'jornada':'Jornada 1','eq1':('gb-eng','Inglaterra'),'eq2':('hr','Croacia'),'fecha':'17 Jun','hora':'22:00'},
+            {'jornada':'Jornada 1','eq1':('gh','Ghana'),'eq2':('pa','Panamá'),'fecha':'18 Jun','hora':'01:00'},
+            {'jornada':'Jornada 2','eq1':('gb-eng','Inglaterra'),'eq2':('gh','Ghana'),'fecha':'23 Jun','hora':'22:00'},
+            {'jornada':'Jornada 2','eq1':('pa','Panamá'),'eq2':('hr','Croacia'),'fecha':'24 Jun','hora':'01:00'},
+            {'jornada':'Jornada 3','eq1':('hr','Croacia'),'eq2':('gh','Ghana'),'fecha':'27 Jun','hora':'23:00'},
+            {'jornada':'Jornada 3','eq1':('pa','Panamá'),'eq2':('gb-eng','Inglaterra'),'fecha':'27 Jun','hora':'23:00'},
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -698,8 +706,8 @@ def _render_ranking(standings):
 @public_bp.route("/")
 def welcome():
     if _logged_in():
-        return redirect(url_for("public.ranking"))
-    return _render_welcome()
+        return _render_ranking()
+    return _render("login_register")
 
 
 @public_bp.post("/entrar")
@@ -707,22 +715,22 @@ def login():
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
     if not email or not password:
-        return _render_welcome(login_error="Introduce email y PIN.")
+        return _render("login_register", login_error="Introduce email y PIN.")
     try:
         participant = get_storage().get_participant_by_email(email)
     except Exception as exc:
-        return _render_welcome(login_error=f"Error de conexión: {exc}")
+        return _render("login_register", login_error=f"Error de conexión: {exc}")
     if not participant or not participant.get("password_hash"):
-        return _render_welcome(login_error="No encontramos ese email. ¿Quizá te registraste con otro?")
+        return _render("login_register", login_error="No encontramos ese email.")
     if not check_password_hash(participant["password_hash"], password):
-        return _render_welcome(login_error="El PIN no coincide.")
+        return _render("login_register", login_error="El PIN no coincide.")
     session["participant_id"] = participant["id"]
     session["participant_name"] = participant["name"]
     session["participant_email"] = participant["email"]
     pred = participant.get("prediction", {})
     if not pred.get("grupos"):
         return redirect(url_for("public.grupos_fase"))
-    return redirect(url_for("public.ranking"))
+    return redirect(url_for("public.welcome"))
 
 
 @public_bp.post("/registro")
@@ -731,20 +739,19 @@ def register():
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
     if not name or not email or not password:
-        return _render_welcome(register_error="Completa nombre, email y PIN.")
+        return _render("login_register", register_error="Completa nombre, email y PIN.")
     if len(password) < 4:
-        return _render_welcome(register_error="El PIN debe tener al menos 4 caracteres.", suggested_name=name)
+        return _render("login_register", register_error="El PIN debe tener al menos 4 caracteres.", suggested_name=name)
     try:
         storage = get_storage()
         if storage.get_participant_by_email(email):
-            return _render_welcome(register_error="Ese email ya está registrado.", suggested_name=name)
-        password_hash = generate_password_hash(password)
-        storage.create_participant(name, email, password_hash)
+            return _render("login_register", register_error="Ese email ya está registrado.", suggested_name=name)
+        storage.create_participant(name, email, generate_password_hash(password))
         participant = storage.get_participant_by_email(email)
     except Exception as exc:
-        return _render_welcome(register_error=f"Error al registrar: {exc}", suggested_name=name)
+        return _render("login_register", register_error=f"Error al registrar: {exc}", suggested_name=name)
     if not participant:
-        return _render_welcome(register_error="Registro OK pero error al iniciar sesión. Intenta entrar con tu email y PIN.", suggested_name=name)
+        return _render("login_register", register_error="Registro OK pero error al iniciar sesión. Intenta entrar.", suggested_name=name)
     session["participant_id"] = participant["id"]
     session["participant_name"] = participant["name"]
     session["participant_email"] = participant["email"]
@@ -757,8 +764,7 @@ def logout():
     return redirect(url_for("public.welcome"))
 
 
-@public_bp.route("/ranking")
-def ranking():
+def _render_ranking():
     try:
         storage = get_storage()
         participants = storage.load_participants()
@@ -766,7 +772,6 @@ def ranking():
     except Exception:
         participants, results = {}, {}
     standings = build_standings(participants, results)
-    # attach id to each row so ranking links work
     try:
         all_p = get_storage().load_participants_full()
         id_map = {p["name"]: p["id"] for p in all_p}
@@ -775,7 +780,65 @@ def ranking():
     except Exception:
         for row in standings:
             row["id"] = ""
-    return _render_ranking(standings)
+
+    has_pred = False
+    uid = session.get("participant_id")
+    if uid:
+        try:
+            p = get_storage().get_participant_by_id(uid)
+            pred = p.get("prediction", {}) if p else {}
+            has_pred = bool(pred.get("grupos") or pred.get("eliminatorias"))
+        except Exception:
+            pass
+
+    return _render("inicio", clasificacion=standings, has_prediction=has_pred)
+
+
+@public_bp.route("/ranking")
+def ranking():
+    return _render_ranking()
+
+
+@public_bp.route("/grupos")
+def ver_grupos():
+    try:
+        results = get_storage().load_results()
+    except Exception:
+        results = {}
+    grupos_fmt = _grupos_fmt()
+    grupos_ordenados = {}
+    for letra, equipos in grupos_fmt.items():
+        letra_min = letra.lower()
+        r1 = results.get(f"g_{letra_min}_1", "")
+        r2 = results.get(f"g_{letra_min}_2", "")
+        r3 = results.get(f"g_{letra_min}_3", "")
+        equipos_dict = {pais: iso for iso, pais in equipos}
+        ordenados = []
+        if r1 in equipos_dict: ordenados.append((equipos_dict[r1], r1, "1º"))
+        if r2 in equipos_dict: ordenados.append((equipos_dict[r2], r2, "2º"))
+        if r3 in equipos_dict: ordenados.append((equipos_dict[r3], r3, "3º"))
+        puestos = [e[1] for e in ordenados]
+        for iso, pais in equipos:
+            if pais not in puestos:
+                ordenados.append((iso, pais, "-"))
+        grupos_ordenados[letra] = ordenados
+    return _render("ver_grupos", grupos_ordenados=grupos_ordenados)
+
+
+@public_bp.route("/horarios")
+def ver_horarios():
+    return _render("ver_horarios", calendario=_generar_calendario())
+
+
+@public_bp.route("/prediccion/ver/<participant_id>")
+def ver_prediccion(participant_id):
+    try:
+        p = get_storage().get_participant_by_id(participant_id)
+    except Exception:
+        return redirect(url_for("public.welcome"))
+    if not p:
+        return redirect(url_for("public.welcome"))
+    return _render("ver_prediccion", nombre=p["name"], predicciones=p.get("prediction") or {})
 
 
 @public_bp.route("/prediccion/grupos", methods=["GET", "POST"])
@@ -784,16 +847,14 @@ def grupos_fase():
         return _require_login()
     storage = get_storage()
     if request.method == "POST":
-        grupos_data = {k: v for k, v in request.form.items()}
         try:
             p = storage.get_participant_by_id(session["participant_id"])
             pred = p.get("prediction", {}) if p else {}
-            pred["grupos"] = grupos_data
+            pred["grupos"] = request.form.to_dict()
             storage.update_prediction(session["participant_id"], pred)
-        except Exception as exc:
+        except Exception:
             pass
         return redirect(url_for("public.eliminatorias_fase"))
-
     saved = {}
     try:
         p = storage.get_participant_by_id(session["participant_id"])
@@ -801,14 +862,7 @@ def grupos_fase():
             saved = (p.get("prediction") or {}).get("grupos", {})
     except Exception:
         pass
-
-    return render_template_string(
-        GRUPOS_TEMPLATE,
-        topbar=_topbar(show_logout=True),
-        groups=GROUPS,
-        teams=TEAMS,
-        saved=saved,
-    )
+    return _render("fase_grupos", grupos=_grupos_fmt(), saved=saved)
 
 
 @public_bp.route("/prediccion/eliminatorias", methods=["GET", "POST"])
@@ -816,9 +870,8 @@ def eliminatorias_fase():
     if not _logged_in():
         return _require_login()
     storage = get_storage()
-
     if request.method == "POST":
-        elim_data = {
+        elim = {
             "octavos": request.form.getlist("octavos"),
             "cuartos": request.form.getlist("cuartos"),
             "semis": request.form.getlist("semis"),
@@ -830,13 +883,11 @@ def eliminatorias_fase():
         try:
             p = storage.get_participant_by_id(session["participant_id"])
             pred = p.get("prediction", {}) if p else {}
-            pred["eliminatorias"] = elim_data
+            pred["eliminatorias"] = elim
             storage.update_prediction(session["participant_id"], pred)
         except Exception:
             pass
-        return redirect(url_for("public.ranking"))
-
-    # Build clasificados from groups prediction
+        return redirect(url_for("public.welcome"))
     clasificados = []
     try:
         p = storage.get_participant_by_id(session["participant_id"])
@@ -851,54 +902,238 @@ def eliminatorias_fase():
                         seen.add(eq)
     except Exception:
         pass
-
     if not clasificados:
         return redirect(url_for("public.grupos_fase"))
+    return _render("eliminatorias", nombre=session.get("participant_name", ""), clasificados=clasificados)
 
+
+# ---------------------------------------------------------------------------
+# ADMIN
+# ---------------------------------------------------------------------------
+@public_bp.route("/admin", methods=["GET", "POST"])
+def admin():
+    from flask import current_app
+    from app.services.sync import fetch_results
+
+    admin_password = current_app.config.get("ADMIN_PASSWORD", "")
+    authed = session.get("admin_authed", False)
+    msg, ok, error = None, False, None
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "login":
+            if admin_password and request.form.get("admin_password") == admin_password:
+                session["admin_authed"] = True
+                authed = True
+            else:
+                error = "Contraseña incorrecta."
+
+        elif action == "sync_api" and authed:
+            api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
+            if not api_key:
+                msg, ok = "Falta FOOTBALL_DATA_API_KEY en las variables de entorno de Vercel.", False
+            else:
+                try:
+                    new_results = fetch_results(api_key)
+                    if new_results:
+                        storage = get_storage()
+                        existing = storage.load_results()
+                        existing.update(new_results)
+                        storage.save_results(existing)
+                        msg, ok = f"Sincronizado correctamente. Campos: {', '.join(new_results.keys())}", True
+                    else:
+                        msg, ok = "Sin datos nuevos aún (el torneo quizás no ha empezado).", True
+                except Exception as exc:
+                    msg, ok = f"Error al sincronizar: {exc}", False
+
+        elif action == "save_results" and authed:
+            try:
+                results = {}
+                for letra in "ABCDEFGHIJKL":
+                    for pos in ("1", "2", "3"):
+                        val = request.form.get(f"g_{letra}_{pos}", "").strip()
+                        if val:
+                            results[f"g_{letra.lower()}_{pos}"] = val
+                for ronda in ("octavos", "cuartos", "semis", "final"):
+                    vals = request.form.getlist(ronda)
+                    if vals:
+                        results[ronda] = vals
+                for field in ("campeon", "subcampeon"):
+                    val = request.form.get(field, "").strip()
+                    if val:
+                        results[field] = val
+                pichichi = request.form.get("pichichi", "").strip()
+                if pichichi:
+                    results["pichichi"] = [pichichi.lower()]
+                get_storage().save_results(results)
+                msg, ok = "Resultados guardados correctamente.", True
+            except Exception as exc:
+                msg, ok = f"Error al guardar: {exc}", False
+
+    current_results = {}
+    if authed:
+        try:
+            current_results = get_storage().load_results()
+        except Exception:
+            pass
+
+    grupos_fmt = _grupos_fmt()
+    all_teams = sorted(set(pais for equipos in grupos_fmt.values() for _, pais in equipos))
+
+    from flask import current_app as _app
+    has_api_key = bool(_app.config.get("FOOTBALL_DATA_API_KEY", ""))
+
+    # Render admin with Bootstrap (same style as the rest of the app)
+    ADMIN_HTML = """
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin – Porra Mundial 2026</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'Poppins',sans-serif;background:#f2f9f5;color:#2c3e50;padding-top:30px;}
+  .card{border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,.05);border:none;background:rgba(255,255,255,.98);}
+  .team-checkbox{display:none;}
+  .team-label{cursor:pointer;border:2px solid #dee2e6;border-radius:8px;padding:8px;transition:all .2s;display:block;text-align:center;background:white;font-weight:600;font-size:.85rem;}
+  .team-checkbox:checked+.team-label{border-color:#198754;background:#e8f5e9;color:#0f5132;}
+</style>
+</head><body>
+<div class="container-fluid px-4 mb-5" style="max-width:1300px;">
+  <div class="d-flex justify-content-between align-items-center py-3 mb-4 border-bottom border-success">
+    <h2 class="fw-bold text-success m-0">⚙️ Panel de Administrador</h2>
+    <a href="/" class="btn btn-outline-success fw-bold">← Volver a la app</a>
+  </div>
+
+  {% if not authed %}
+  <div class="row justify-content-center"><div class="col-md-4">
+    <div class="card p-4">
+      <h4 class="fw-bold text-success border-bottom pb-3 mb-4 text-center">Acceso Admin</h4>
+      {% if error %}<div class="alert alert-danger py-2">{{ error }}</div>{% endif %}
+      <form method="POST">
+        <input type="hidden" name="action" value="login">
+        <div class="mb-3"><label class="form-label fw-bold text-success">Contraseña</label>
+        <input type="password" name="admin_password" class="form-control border-success" required></div>
+        <button type="submit" class="btn btn-success fw-bold w-100 py-2">Entrar</button>
+      </form>
+    </div>
+  </div></div>
+
+  {% else %}
+  {% if msg %}<div class="alert {{ 'alert-success' if ok else 'alert-danger' }} fw-bold">{{ msg }}</div>{% endif %}
+
+  <div class="card p-3 mb-4">
+    <h5 class="fw-bold text-success mb-3">🔄 Sincronización Automática</h5>
+    <form method="POST" class="d-flex gap-3 align-items-center flex-wrap">
+      <input type="hidden" name="action" value="sync_api">
+      <button type="submit" class="btn btn-primary fw-bold" {{ '' if has_api_key else 'disabled' }}>
+        🔄 Sincronizar desde API del Mundial
+      </button>
+      {% if not has_api_key %}
+      <span class="text-danger fw-bold small">⚠️ Falta configurar FOOTBALL_DATA_API_KEY en Vercel</span>
+      {% else %}
+      <span class="text-muted small">Actualiza automáticamente con resultados reales de football-data.org</span>
+      {% endif %}
+    </form>
+  </div>
+
+  <form method="POST">
+    <input type="hidden" name="action" value="save_results">
+
+    <div class="card p-3 mb-4">
+      <h5 class="fw-bold text-success mb-3">🌍 Fase de Grupos</h5>
+      <div class="row">
+        {% for letra, equipos in grupos.items() %}
+        <div class="col-md-6 col-lg-3 mb-3">
+          <div class="card bg-light border-0 shadow-sm h-100">
+            <div class="card-header bg-success text-white fw-bold text-center py-2">Grupo {{ letra }}</div>
+            <div class="card-body p-3 d-flex flex-column gap-2">
+              {% for pos, label in [('1','1º Puesto'),('2','2º Puesto'),('3','Mejor 3º')] %}
+              <select name="g_{{ letra }}_{{ pos }}" class="form-select form-select-sm fw-bold">
+                <option value="">{{ label }} — sin resultado</option>
+                {% for iso, pais in equipos %}
+                <option value="{{ pais }}" {{ 'selected' if results.get('g_' ~ letra.lower() ~ '_' ~ pos) == pais }}>
+                  {{ label }} · {{ pais }}
+                </option>
+                {% endfor %}
+              </select>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card p-3 mb-4">
+      <h5 class="fw-bold text-success mb-3">⚽ Eliminatorias</h5>
+      {% for ronda, label, maxsel in [('octavos','Octavos de Final',16),('cuartos','Cuartos de Final',8),('semis','Semifinales',4),('final','Final',2)] %}
+      <h6 class="fw-bold text-dark mt-3 mb-2">{{ label }} ({{ maxsel }} equipos)</h6>
+      <div class="row g-2 mb-3">
+        {% for tname in all_teams %}
+        <div class="col-6 col-md-3 col-lg-2">
+          <input type="checkbox" name="{{ ronda }}" value="{{ tname }}" id="r_{{ ronda }}_{{ loop.index }}" class="team-checkbox"
+                 {{ 'checked' if tname in (results.get(ronda) or []) }}>
+          <label class="team-label" for="r_{{ ronda }}_{{ loop.index }}">{{ tname }}</label>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <div class="row mt-3">
+        <div class="col-md-4 mb-3">
+          <label class="form-label fw-bold text-success">🏆 Campeón</label>
+          <select name="campeon" class="form-select fw-bold">
+            <option value="">— sin resultado —</option>
+            {% for tname in all_teams %}
+            <option value="{{ tname }}" {{ 'selected' if results.get('campeon') == tname }}>{{ tname }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label fw-bold text-secondary">🥈 Subcampeón</label>
+          <select name="subcampeon" class="form-select fw-bold">
+            <option value="">— sin resultado —</option>
+            {% for tname in all_teams %}
+            <option value="{{ tname }}" {{ 'selected' if results.get('subcampeon') == tname }}>{{ tname }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label fw-bold text-primary">⚽ Pichichi</label>
+          <input type="text" name="pichichi" class="form-control fw-bold"
+                 value="{{ results.get('pichichi',[''])[0] if results.get('pichichi') else '' }}"
+                 placeholder="Ej: Kylian Mbappé">
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center mb-5">
+      <button type="submit" class="btn btn-success fw-bold px-5 py-3 fs-5">💾 Guardar resultados</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body></html>
+"""
     return render_template_string(
-        ELIM_TEMPLATE,
-        topbar=_topbar(show_logout=True),
-        clasificados=clasificados,
+        ADMIN_HTML,
+        authed=authed, grupos=grupos_fmt, all_teams=all_teams,
+        results=current_results, msg=msg, ok=ok, error=error,
+        has_api_key=has_api_key,
     )
-
-
-@public_bp.route("/prediccion/ver/<participant_id>")
-def ver_prediccion(participant_id):
-    try:
-        p = get_storage().get_participant_by_id(participant_id)
-    except Exception:
-        return redirect(url_for("public.ranking"))
-    if not p:
-        return redirect(url_for("public.ranking"))
-    pred = p.get("prediction") or {}
-    return render_template_string(
-        VER_TEMPLATE,
-        topbar=_topbar(show_logout=_logged_in()),
-        name=p["name"],
-        pred_grupos=pred.get("grupos", {}),
-        pred_elim=pred.get("eliminatorias", {}),
-    )
-
-
-@public_bp.route("/health")
-def health():
-    return {"status": "ok"}
 
 
 @public_bp.route("/sync")
 def sync_results():
-    """Called by external cron (cron-job.org) every hour to auto-update results."""
     from flask import current_app
     from app.services.sync import fetch_results
-
     secret = current_app.config.get("SYNC_SECRET", "")
     if secret and request.args.get("secret") != secret:
         return {"error": "unauthorized"}, 401
-
     api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
     if not api_key:
         return {"error": "FOOTBALL_DATA_API_KEY not configured"}, 500
-
     try:
         new_results = fetch_results(api_key)
         if new_results:
@@ -911,228 +1146,6 @@ def sync_results():
         return {"error": str(exc)}, 500
 
 
-# ---------------------------------------------------------------------------
-# ADMIN
-# ---------------------------------------------------------------------------
-ADMIN_TEMPLATE = """<!doctype html><html lang="es"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin – Porra Mundial 2026</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;850;900&display=swap" rel="stylesheet">
-""" + _BASE_STYLE + """
-<style>
-  .admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:28px;}
-  .group-card{border:1px solid var(--line);border-radius:9px;overflow:hidden;}
-  .group-card-header{background:var(--pitch);color:#fff;padding:9px 14px;font-weight:850;}
-  .group-card-body{padding:12px;display:grid;gap:8px;}
-  select,input[type=text]{min-height:40px;font-size:.88rem;}
-  .section-title{font-size:1.1rem;font-weight:850;color:var(--pitch-dark);margin:24px 0 12px;
-    padding-bottom:8px;border-bottom:2px solid var(--line);}
-  .teams-check{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
-  .chk{display:none;}
-  .lbl{padding:7px 12px;border:2px solid var(--line);border-radius:7px;cursor:pointer;
-    font-weight:750;font-size:.85rem;background:#fff;}
-  .chk:checked+.lbl{border-color:var(--pitch);background:#e6f5ee;color:var(--pitch-dark);}
-  .save-bar{position:sticky;bottom:0;background:#fff;border-top:2px solid var(--line);
-    padding:14px 20px;display:flex;gap:12px;align-items:center;}
-  .msg{padding:10px 16px;border-radius:8px;font-weight:750;}
-  .msg-ok{background:#d4edda;color:#0f5132;}
-  .msg-err{background:#fde8e4;color:#8b2215;}
-  .login-box{max-width:380px;margin:60px auto;padding:32px;border:1px solid var(--line);border-radius:12px;
-    background:#fff;box-shadow:0 20px 56px rgba(7,63,43,.1);}
-  .login-box h2{margin:0 0 20px;color:var(--pitch-dark);}
-</style>
-</head><body>
-{{ topbar | safe }}
-<main class="shell">
-
-{% if not authed %}
-<div class="login-box">
-  <h2>Acceso Admin</h2>
-  {% if error %}<p class="msg msg-err">{{ error }}</p>{% endif %}
-  <form method="post">
-    <input type="hidden" name="action" value="login">
-    <label>Contraseña de administrador</label>
-    <input type="password" name="admin_password" style="margin:8px 0 16px" required>
-    <button class="btn btn-primary" type="submit" style="width:100%">Entrar</button>
-  </form>
-</div>
-
-{% else %}
-
-<section class="card">
-  <div class="section-header"><h2>Panel de Administrador</h2></div>
-  <div class="body-pad">
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
-      <form method="post" style="margin:0;">
-        <input type="hidden" name="action" value="sync_api">
-        <button class="btn" type="submit" style="background:#215f9f;color:#fff;">
-          🔄 Sincronizar desde API del Mundial
-        </button>
-      </form>
-      <span style="color:var(--muted);font-size:.85rem;">Actualiza automáticamente con los resultados reales de football-data.org</span>
-    </div>
-    {% if msg %}<p class="msg {{ 'msg-ok' if ok else 'msg-err' }}">{{ msg }}</p><br>{% endif %}
-
-    <form method="post">
-      <input type="hidden" name="action" value="save_results">
-
-      <p class="section-title">Fase de Grupos — Clasificados por grupo</p>
-      <div class="admin-grid">
-        {% for letra, team_ids in groups.items() %}
-        <div class="group-card">
-          <div class="group-card-header">Grupo {{ letra }}</div>
-          <div class="group-card-body">
-            {% for pos, label in [('1','1º'), ('2','2º'), ('3','Mejor 3º')] %}
-            <select name="g_{{ letra }}_{{ pos }}">
-              <option value="">{{ label }} — sin resultado</option>
-              {% for tid in team_ids %}
-              {% set tname = teams[tid].name %}
-              <option value="{{ tname }}" {{ 'selected' if results.get('g_' ~ letra.lower() ~ '_' ~ pos) == tname }}>
-                {{ label }} · {{ tname }}
-              </option>
-              {% endfor %}
-            </select>
-            {% endfor %}
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-
-      <p class="section-title">Eliminatorias</p>
-
-      {% set all_teams = teams.values()|map(attribute='name')|sort|list %}
-
-      {% for ronda, label, maxsel in [
-          ('octavos','Octavos de Final (16)',16),
-          ('cuartos','Cuartos de Final (8)',8),
-          ('semis','Semifinales (4)',4),
-          ('final','Final (2)',2)] %}
-      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">{{ label }}</p>
-      <div class="teams-check">
-        {% for tname in all_teams %}
-        <span>
-          <input type="checkbox" name="{{ ronda }}" value="{{ tname }}"
-                 id="r_{{ ronda }}_{{ loop.index }}" class="chk"
-                 {{ 'checked' if tname in (results.get(ronda) or []) }}>
-          <label class="lbl" for="r_{{ ronda }}_{{ loop.index }}">{{ tname }}</label>
-        </span>
-        {% endfor %}
-      </div>
-      {% endfor %}
-
-      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">Campeón</p>
-      <select name="campeon" style="max-width:300px;margin-bottom:14px;">
-        <option value="">— sin resultado —</option>
-        {% for tname in all_teams %}
-        <option value="{{ tname }}" {{ 'selected' if results.get('campeon') == tname }}>{{ tname }}</option>
-        {% endfor %}
-      </select>
-
-      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">Subcampeón</p>
-      <select name="subcampeon" style="max-width:300px;margin-bottom:14px;">
-        <option value="">— sin resultado —</option>
-        {% for tname in all_teams %}
-        <option value="{{ tname }}" {{ 'selected' if results.get('subcampeon') == tname }}>{{ tname }}</option>
-        {% endfor %}
-      </select>
-
-      <p style="font-weight:850;color:var(--pitch-dark);margin:14px 0 8px;">Pichichi (máximo goleador)</p>
-      <input type="text" name="pichichi" value="{{ results.get('pichichi',[''])[0] if results.get('pichichi') else '' }}"
-             placeholder="Ej: Kylian Mbappé" style="max-width:300px;margin-bottom:20px;">
-
-      <div class="save-bar">
-        <button class="btn btn-primary" type="submit">💾 Guardar resultados</button>
-        <span style="color:var(--muted);font-size:.88rem;">Los puntos del ranking se actualizan al guardar.</span>
-      </div>
-    </form>
-  </div>
-</section>
-{% endif %}
-
-</main></body></html>
-"""
-
-
-@public_bp.route("/admin", methods=["GET", "POST"])
-def admin():
-    from flask import current_app
-    admin_password = current_app.config.get("ADMIN_PASSWORD", "")
-    authed = session.get("admin_authed", False)
-    msg, ok, error = None, False, None
-
-    if request.method == "POST":
-        action = request.form.get("action")
-
-        if action == "login":
-            pwd = request.form.get("admin_password", "")
-            if admin_password and pwd == admin_password:
-                session["admin_authed"] = True
-                authed = True
-            else:
-                error = "Contraseña incorrecta."
-
-        elif action == "sync_api" and authed:
-            from flask import current_app
-            from app.services.sync import fetch_results
-            api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
-            if not api_key:
-                msg, ok = "Falta configurar FOOTBALL_DATA_API_KEY en Vercel.", False
-            else:
-                try:
-                    new_results = fetch_results(api_key)
-                    if new_results:
-                        storage = get_storage()
-                        existing = storage.load_results()
-                        existing.update(new_results)
-                        storage.save_results(existing)
-                        msg, ok = f"Sincronizado. Campos actualizados: {', '.join(new_results.keys())}", True
-                    else:
-                        msg, ok = "Sin datos nuevos (el torneo quizás no ha empezado o la API no devuelve resultados aún).", True
-                except Exception as exc:
-                    msg, ok = f"Error al sincronizar: {exc}", False
-
-        elif action == "save_results" and authed:
-            try:
-                storage = get_storage()
-                results = {}
-                for letra in "ABCDEFGHIJKL":
-                    for pos in ("1", "2", "3"):
-                        val = request.form.get(f"g_{letra}_{pos}", "").strip()
-                        if val:
-                            results[f"g_{letra.lower()}_{pos}"] = val
-                for ronda in ("octavos", "cuartos", "semis", "final"):
-                    vals = request.form.getlist(ronda)
-                    if vals:
-                        results[ronda] = vals
-                campeon = request.form.get("campeon", "").strip()
-                if campeon:
-                    results["campeon"] = campeon
-                subcampeon = request.form.get("subcampeon", "").strip()
-                if subcampeon:
-                    results["subcampeon"] = subcampeon
-                pichichi = request.form.get("pichichi", "").strip()
-                if pichichi:
-                    results["pichichi"] = [pichichi.lower()]
-                storage.save_results(results)
-                msg, ok = "Resultados guardados correctamente.", True
-            except Exception as exc:
-                msg, ok = f"Error al guardar: {exc}", False
-
-    current_results = {}
-    if authed:
-        try:
-            current_results = get_storage().load_results()
-        except Exception:
-            pass
-
-    return render_template_string(
-        ADMIN_TEMPLATE,
-        topbar=_topbar(show_logout=_logged_in()),
-        authed=authed,
-        groups=GROUPS,
-        teams=TEAMS,
-        results=current_results,
-        msg=msg,
-        ok=ok,
-        error=error,
-    )
+@public_bp.route("/health")
+def health():
+    return {"status": "ok"}
