@@ -822,9 +822,14 @@ def _get_match_info():
         # Sort scheduled fixtures by utc_date ascending to get the earliest one
         scheduled = []
         for f in fixtures:
-            if f.get("status") == "SCHEDULED" and f.get("utc_date"):
+            if f.get("status") == "SCHEDULED":
                 try:
-                    dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
+                    if f.get("utc_date"):
+                        dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
+                    else:
+                        # Fallback: parse fecha + hora as peninsular time (UTC+2)
+                        fecha_hora = f.get("fecha", "") + " " + f.get("hora", "00:00") + " 2026"
+                        dt = datetime.datetime.strptime(fecha_hora, "%d %b %H:%M %Y") - datetime.timedelta(hours=2)
                     if dt > now_utc:
                         scheduled.append((dt, f))
                 except Exception:
@@ -1066,9 +1071,13 @@ def _render_ranking():
     now_utc = datetime.datetime.utcnow()
     scheduled = []
     for f in fixtures:
-        if f.get("status") == "SCHEDULED" and f.get("utc_date"):
+        if f.get("status") == "SCHEDULED":
             try:
-                dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
+                if f.get("utc_date"):
+                    dt = datetime.datetime.strptime(f["utc_date"], "%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    fecha_hora = f.get("fecha", "") + " " + f.get("hora", "00:00") + " 2026"
+                    dt = datetime.datetime.strptime(fecha_hora, "%d %b %H:%M %Y") - datetime.timedelta(hours=2)
                 if dt > now_utc:
                     scheduled.append((dt, f))
             except Exception:
