@@ -24,6 +24,8 @@ def create_app(test_config=None):
         SUPABASE_URL=os.environ.get("SUPABASE_URL"),
         SUPABASE_SERVICE_ROLE_KEY=os.environ.get("SUPABASE_SERVICE_ROLE_KEY"),
         ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD", ""),
+        FOOTBALL_DATA_API_KEY=os.environ.get("FOOTBALL_DATA_API_KEY", ""),
+        SYNC_SECRET=os.environ.get("SYNC_SECRET", ""),
     )
     if test_config:
         app.config.update(test_config)

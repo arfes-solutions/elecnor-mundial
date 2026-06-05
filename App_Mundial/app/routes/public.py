@@ -885,6 +885,32 @@ def health():
     return {"status": "ok"}
 
 
+@public_bp.route("/sync")
+def sync_results():
+    """Called by external cron (cron-job.org) every hour to auto-update results."""
+    from flask import current_app
+    from app.services.sync import fetch_results
+
+    secret = current_app.config.get("SYNC_SECRET", "")
+    if secret and request.args.get("secret") != secret:
+        return {"error": "unauthorized"}, 401
+
+    api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
+    if not api_key:
+        return {"error": "FOOTBALL_DATA_API_KEY not configured"}, 500
+
+    try:
+        new_results = fetch_results(api_key)
+        if new_results:
+            storage = get_storage()
+            existing = storage.load_results()
+            existing.update(new_results)
+            storage.save_results(existing)
+        return {"status": "ok", "updated_keys": list(new_results.keys())}
+    except Exception as exc:
+        return {"error": str(exc)}, 500
+
+
 # ---------------------------------------------------------------------------
 # ADMIN
 # ---------------------------------------------------------------------------
@@ -936,6 +962,15 @@ ADMIN_TEMPLATE = """<!doctype html><html lang="es"><head>
 <section class="card">
   <div class="section-header"><h2>Panel de Administrador</h2></div>
   <div class="body-pad">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+      <form method="post" style="margin:0;">
+        <input type="hidden" name="action" value="sync_api">
+        <button class="btn" type="submit" style="background:#215f9f;color:#fff;">
+          🔄 Sincronizar desde API del Mundial
+        </button>
+      </form>
+      <span style="color:var(--muted);font-size:.85rem;">Actualiza automáticamente con los resultados reales de football-data.org</span>
+    </div>
     {% if msg %}<p class="msg {{ 'msg-ok' if ok else 'msg-err' }}">{{ msg }}</p><br>{% endif %}
 
     <form method="post">
@@ -1035,6 +1070,26 @@ def admin():
                 authed = True
             else:
                 error = "Contraseña incorrecta."
+
+        elif action == "sync_api" and authed:
+            from flask import current_app
+            from app.services.sync import fetch_results
+            api_key = current_app.config.get("FOOTBALL_DATA_API_KEY", "")
+            if not api_key:
+                msg, ok = "Falta configurar FOOTBALL_DATA_API_KEY en Vercel.", False
+            else:
+                try:
+                    new_results = fetch_results(api_key)
+                    if new_results:
+                        storage = get_storage()
+                        existing = storage.load_results()
+                        existing.update(new_results)
+                        storage.save_results(existing)
+                        msg, ok = f"Sincronizado. Campos actualizados: {', '.join(new_results.keys())}", True
+                    else:
+                        msg, ok = "Sin datos nuevos (el torneo quizás no ha empezado o la API no devuelve resultados aún).", True
+                except Exception as exc:
+                    msg, ok = f"Error al sincronizar: {exc}", False
 
         elif action == "save_results" and authed:
             try:
