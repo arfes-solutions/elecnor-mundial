@@ -454,10 +454,10 @@ def register():
         password_hash = generate_password_hash(password)
         storage.create_participant(name, email, password_hash)
         participant = storage.get_participant_by_email(email)
-    except Exception:
+    except Exception as exc:
         return render_template_string(
             WELCOME_TEMPLATE,
-            register_error="Error de conexión. Inténtalo de nuevo en un momento.",
+            register_error=f"[DEBUG] {type(exc).__name__}: {exc}",
             suggested_name=name,
         )
 
