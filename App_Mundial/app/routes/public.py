@@ -929,9 +929,9 @@ def ver_grupos():
     except Exception:
         results, fixtures = {}, []
 
-    # Detect phase: are there any knockout fixtures (scheduled, live or finished)?
+    # Only switch to knockout view when at least one knockout match has been played or is live
     knockout_fixtures = [f for f in fixtures if f.get("stage","") in _KNOCKOUT_STAGES]
-    in_knockout = bool(knockout_fixtures)
+    in_knockout = any(f.get("is_finished") or f.get("is_live") for f in knockout_fixtures)
 
     if in_knockout:
         # Group knockout fixtures by stage in order
