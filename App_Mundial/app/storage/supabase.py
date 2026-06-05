@@ -32,6 +32,35 @@ def load_participants():
     return {row["name"]: row.get("prediction_json") or {} for row in r.json()}
 
 
+def get_prediction_by_name(name):
+    """Return prediction dict for a participant name, or None if not found."""
+    r = _check(requests.get(
+        _url("participants"),
+        headers=_headers(),
+        params={
+            "select": "id,name,prediction_json",
+            "name": f"ilike.{name.strip()}",
+            "limit": "1",
+        },
+    ))
+    data = r.json()
+    if not data:
+        return None
+    row = data[0]
+    return {"id": row["id"], "name": row["name"], "prediction": row.get("prediction_json") or {}}
+
+
+def save_prediction_by_name(name, prediction):
+    """Upsert a participant by name (no email/password needed)."""
+    dummy_email = name.strip().lower().replace(" ", ".") + "@elecnor.local"
+    h = {**_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
+    _check(requests.post(
+        _url("participants"),
+        headers=h,
+        json={"name": name.strip(), "email": dummy_email, "prediction_json": prediction},
+    ))
+
+
 def load_participants_full():
     r = _check(requests.get(
         _url("participants"),

@@ -21,10 +21,7 @@ def _grupos_fmt():
 
 
 def _logged_in():
-    return bool(session.get("participant_id"))
-
-def _require_login():
-    return redirect(url_for("public.welcome"))
+    return session.get("authenticated", False)
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +83,7 @@ HTML_TEMPLATE = """
             <div class="d-flex gap-2">
                 <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
                 <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
-                {% if current_user %}
+                {% if authenticated %}
                 <a href="{{ url_for('public.logout') }}" class="btn btn-outline-light fw-bold px-3">Salir</a>
                 {% endif %}
             </div>
@@ -100,13 +97,7 @@ HTML_TEMPLATE = """
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
                     <h3 class="card-title m-0 fw-bold text-success">Clasificación General</h3>
-                    {% if not current_user %}
-                        <a href="{{ url_for('public.welcome') }}" class="btn btn-success-custom text-white fw-bold px-4 py-2">➕ Participar</a>
-                    {% elif not has_prediction %}
-                        <a href="{{ url_for('public.grupos_fase') }}" class="btn btn-success-custom text-white fw-bold px-4 py-2">📝 Hacer mi predicción</a>
-                    {% else %}
-                        <a href="{{ url_for('public.grupos_fase') }}" class="btn btn-outline-custom fw-bold px-4 py-2">✏️ Editar predicción</a>
-                    {% endif %}
+                    <a href="{{ url_for('public.nueva_prediccion') }}" class="btn btn-success-custom text-white fw-bold px-4 py-2">➕ Añadir predicción</a>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
@@ -141,23 +132,51 @@ HTML_TEMPLATE = """
         <div class="row justify-content-center mt-2">
             <div class="col-md-5 col-lg-4">
                 <div class="card p-4">
-                    <h4 class="fw-bold text-success border-bottom pb-3 mb-1 text-center">⚽ Participar en la porra</h4>
-                    <p class="text-center text-muted small mb-4">Introduce tu nombre y la contraseña del grupo.<br>Si es tu primera vez, se te registra automáticamente.</p>
+                    <h4 class="fw-bold text-success border-bottom pb-3 mb-1 text-center">⚽ Porra Mundial 2026</h4>
+                    <p class="text-center text-muted small mb-4">Acceso exclusivo para empleados de Elecnor Sistemas.</p>
                     {% if auth_error %}
                     <div class="alert alert-danger py-2">{{ auth_error }}</div>
                     {% endif %}
                     <form method="POST" action="{{ url_for('public.login') }}">
                         <div class="mb-3">
-                            <label class="form-label fw-bold text-success fs-5">Tu nombre</label>
-                            <input type="text" name="name" class="form-control form-control-lg border-success text-center" required
-                                   value="{{ suggested_name or '' }}" autocomplete="name" placeholder="Ej: Benito Martínez">
+                            <label class="form-label fw-bold text-success fs-5">Usuario</label>
+                            <input type="text" name="username" class="form-control form-control-lg border-success text-center"
+                                   required autocomplete="username" placeholder="Elecnor">
                         </div>
                         <div class="mb-4">
-                            <label class="form-label fw-bold text-success fs-5">Contraseña del grupo</label>
-                            <input type="password" name="password" class="form-control form-control-lg border-success text-center" required autocomplete="current-password" placeholder="••••••••">
+                            <label class="form-label fw-bold text-success fs-5">Contraseña</label>
+                            <input type="password" name="password" class="form-control form-control-lg border-success text-center"
+                                   required autocomplete="current-password" placeholder="••••••••">
                         </div>
                         <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Entrar →</button>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        {% elif vista == 'nuevo_nombre' %}
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-5">
+                <div class="card p-2 p-md-4 mt-4">
+                    <div class="card-body">
+                        <h3 class="mb-4 fw-bold text-success border-bottom pb-3 text-center">➕ Añadir predicción</h3>
+                        {% if nombre_error %}
+                        <div class="alert alert-danger py-2">{{ nombre_error }}</div>
+                        {% endif %}
+                        <form method="POST">
+                            <div class="mb-4 p-3 mt-3">
+                                <label for="nombre" class="form-label fw-bold fs-5 text-success text-center w-100">Introduce tu nombre:</label>
+                                <input type="text" autocomplete="off" class="form-control form-control-lg text-center shadow-sm border-success"
+                                       id="nombre" name="nombre" required placeholder="Ej: Benito Martínez"
+                                       value="{{ suggested_name or '' }}">
+                                <p class="text-muted small text-center mt-2">Así aparecerás en la clasificación.</p>
+                            </div>
+                            <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                                <a href="{{ url_for('public.welcome') }}" class="btn btn-light border px-4 py-2 fw-bold text-secondary">Cancelar</a>
+                                <button type="submit" class="btn btn-success-custom text-white px-5 py-2 fw-bold fs-5">Siguiente →</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -573,7 +592,7 @@ def _render(vista, **kwargs):
     return render_template_string(
         HTML_TEMPLATE,
         vista=vista,
-        current_user=session.get("participant_name"),
+        authenticated=session.get("authenticated", False),
         **kwargs,
     )
 
@@ -684,52 +703,34 @@ def _generar_calendario():
 # ---------------------------------------------------------------------------
 @public_bp.route("/")
 def welcome():
-    if _logged_in():
-        return _render_ranking()
-    return _render("login_register")
+    if not _logged_in():
+        return _render("login_register")
+    return _render_ranking()
 
 
+SHARED_USERNAME = "Elecnor"
 SHARED_PASSWORD = "Mundial26"
+
+
+def _authenticated():
+    return session.get("authenticated", False)
+
+def _require_auth():
+    return redirect(url_for("public.welcome"))
 
 
 @public_bp.post("/entrar")
 def login():
-    name = request.form.get("name", "").strip()
+    username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
-
-    if not name or not password:
-        return _render("login_register", auth_error="Introduce tu nombre y la contraseña.")
-
-    if password != SHARED_PASSWORD:
-        return _render("login_register", auth_error="Contraseña incorrecta. Pide la contraseña a los organizadores.", suggested_name=name)
-
-    try:
-        storage = get_storage()
-        participant = storage.get_participant_by_name(name)
-
-        if not participant:
-            # First time → auto-register
-            dummy_email = name.lower().replace(" ", ".") + "@porra.elecnor"
-            storage.create_participant(name, dummy_email, generate_password_hash(SHARED_PASSWORD))
-            participant = storage.get_participant_by_name(name)
-
-    except Exception as exc:
-        return _render("login_register", auth_error=f"Error de conexión: {exc}", suggested_name=name)
-
-    if not participant:
-        return _render("login_register", auth_error="No se pudo crear el participante. Inténtalo de nuevo.", suggested_name=name)
-
-    session["participant_id"] = participant["id"]
-    session["participant_name"] = participant["name"]
-    pred = participant.get("prediction", {})
-    if not pred.get("grupos"):
-        return redirect(url_for("public.grupos_fase"))
+    if username.lower() != SHARED_USERNAME.lower() or password != SHARED_PASSWORD:
+        return _render("login_register", auth_error="Usuario o contraseña incorrectos.")
+    session["authenticated"] = True
     return redirect(url_for("public.welcome"))
 
 
 @public_bp.post("/registro")
 def register():
-    # Kept for URL compatibility but redirects to login
     return redirect(url_for("public.welcome"))
 
 
@@ -737,6 +738,19 @@ def register():
 def logout():
     session.clear()
     return redirect(url_for("public.welcome"))
+
+
+@public_bp.route("/nueva-prediccion", methods=["GET", "POST"])
+def nueva_prediccion():
+    if not _logged_in():
+        return redirect(url_for("public.welcome"))
+    if request.method == "POST":
+        nombre = request.form.get("nombre", "").strip()
+        if not nombre:
+            return _render("nuevo_nombre", nombre_error="Introduce tu nombre.")
+        session["pred_nombre"] = nombre
+        return redirect(url_for("public.grupos_fase"))
+    return _render("nuevo_nombre")
 
 
 def _render_ranking():
@@ -755,18 +769,7 @@ def _render_ranking():
     except Exception:
         for row in standings:
             row["id"] = ""
-
-    has_pred = False
-    uid = session.get("participant_id")
-    if uid:
-        try:
-            p = get_storage().get_participant_by_id(uid)
-            pred = p.get("prediction", {}) if p else {}
-            has_pred = bool(pred.get("grupos") or pred.get("eliminatorias"))
-        except Exception:
-            pass
-
-    return _render("inicio", clasificacion=standings, has_prediction=has_pred)
+    return _render("inicio", clasificacion=standings)
 
 
 @public_bp.route("/ranking")
@@ -807,6 +810,8 @@ def ver_horarios():
 
 @public_bp.route("/prediccion/ver/<participant_id>")
 def ver_prediccion(participant_id):
+    if not _logged_in():
+        return redirect(url_for("public.welcome"))
     try:
         p = get_storage().get_participant_by_id(participant_id)
     except Exception:
@@ -819,32 +824,36 @@ def ver_prediccion(participant_id):
 @public_bp.route("/prediccion/grupos", methods=["GET", "POST"])
 def grupos_fase():
     if not _logged_in():
-        return _require_login()
-    storage = get_storage()
+        return redirect(url_for("public.welcome"))
+    nombre = session.get("pred_nombre", "")
+    if not nombre:
+        return redirect(url_for("public.nueva_prediccion"))
     if request.method == "POST":
+        pred = {"grupos": request.form.to_dict(), "eliminatorias": {}}
+        session["pred_grupos"] = request.form.to_dict()
         try:
-            p = storage.get_participant_by_id(session["participant_id"])
-            pred = p.get("prediction", {}) if p else {}
-            pred["grupos"] = request.form.to_dict()
-            storage.update_prediction(session["participant_id"], pred)
+            get_storage().save_prediction_by_name(nombre, pred)
         except Exception:
             pass
         return redirect(url_for("public.eliminatorias_fase"))
-    saved = {}
-    try:
-        p = storage.get_participant_by_id(session["participant_id"])
-        if p:
-            saved = (p.get("prediction") or {}).get("grupos", {})
-    except Exception:
-        pass
+    saved = session.get("pred_grupos", {})
+    if not saved:
+        try:
+            p = get_storage().get_prediction_by_name(nombre)
+            if p:
+                saved = p.get("prediction", {}).get("grupos", {})
+        except Exception:
+            pass
     return _render("fase_grupos", grupos=_grupos_fmt(), saved=saved)
 
 
 @public_bp.route("/prediccion/eliminatorias", methods=["GET", "POST"])
 def eliminatorias_fase():
     if not _logged_in():
-        return _require_login()
-    storage = get_storage()
+        return redirect(url_for("public.welcome"))
+    nombre = session.get("pred_nombre", "")
+    if not nombre:
+        return redirect(url_for("public.nueva_prediccion"))
     if request.method == "POST":
         elim = {
             "octavos": request.form.getlist("octavos"),
@@ -856,30 +865,30 @@ def eliminatorias_fase():
             "pichichi": request.form.get("pichichi"),
         }
         try:
-            p = storage.get_participant_by_id(session["participant_id"])
-            pred = p.get("prediction", {}) if p else {}
+            storage = get_storage()
+            p = storage.get_prediction_by_name(nombre)
+            pred = p.get("prediction", {}) if p else {"grupos": {}}
             pred["eliminatorias"] = elim
-            storage.update_prediction(session["participant_id"], pred)
+            storage.save_prediction_by_name(nombre, pred)
         except Exception:
             pass
+        session.pop("pred_nombre", None)
+        session.pop("pred_grupos", None)
         return redirect(url_for("public.welcome"))
+    grupos_data = session.get("pred_grupos", {})
+    if not grupos_data:
+        return redirect(url_for("public.grupos_fase"))
     clasificados = []
-    try:
-        p = storage.get_participant_by_id(session["participant_id"])
-        if p:
-            grupos = (p.get("prediction") or {}).get("grupos", {})
-            seen = set()
-            for letra in "ABCDEFGHIJKL":
-                for pos in ("1", "2", "3"):
-                    eq = grupos.get(f"g_{letra}_{pos}", "")
-                    if eq and eq not in seen:
-                        clasificados.append(eq)
-                        seen.add(eq)
-    except Exception:
-        pass
+    seen = set()
+    for letra in "ABCDEFGHIJKL":
+        for pos in ("1", "2", "3"):
+            eq = grupos_data.get(f"g_{letra}_{pos}", "")
+            if eq and eq not in seen:
+                clasificados.append(eq)
+                seen.add(eq)
     if not clasificados:
         return redirect(url_for("public.grupos_fase"))
-    return _render("eliminatorias", nombre=session.get("participant_name", ""), clasificados=clasificados)
+    return _render("eliminatorias", nombre=nombre, clasificados=clasificados)
 
 
 # ---------------------------------------------------------------------------
