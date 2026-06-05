@@ -141,7 +141,7 @@ HTML_TEMPLATE = """
                         <div class="mb-3">
                             <label class="form-label fw-bold text-success fs-5">Usuario</label>
                             <input type="text" name="username" class="form-control form-control-lg border-success text-center"
-                                   required autocomplete="username" placeholder="Elecnor">
+                                   required autocomplete="username">
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold text-success fs-5">Contraseña</label>
