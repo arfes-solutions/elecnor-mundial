@@ -523,77 +523,99 @@ HTML_TEMPLATE = """
         </div>
 
         {% elif vista == 'ver_prediccion' %}
+        <style>
+            .pred-ok  { background:#d4edda!important; color:#155724!important; border-color:#28a745!important; }
+            .pred-fail{ background:#f8d7da!important; color:#721c24!important; border-color:#dc3545!important; }
+            .pred-none{ background:#fff!important;    color:#333!important;    border-color:#ccc!important; }
+        </style>
         <div class="card p-3 p-md-4 mx-auto" style="max-width: 1200px;">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                     <h3 class="m-0 fw-bold text-success">Predicción de {{ nombre }}</h3>
-                    
+                    <small class="text-muted">🟢 Acertado &nbsp; 🔴 Fallado &nbsp; ⚪ Sin resultado aún</small>
                 </div>
+
                 <h5 class="fw-bold text-secondary mb-3">Fase de Grupos</h5>
                 <div class="row g-3 mb-5">
                     {% for letra in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
                         {% set p1 = predicciones.get('grupos',{}).get('g_' ~ letra ~ '_1', '') %}
                         {% set p2 = predicciones.get('grupos',{}).get('g_' ~ letra ~ '_2', '') %}
                         {% set p3 = predicciones.get('grupos',{}).get('g_' ~ letra ~ '_3', '') %}
+                        {% set r1 = resultados.get('g_' ~ letra.lower() ~ '_1', '') %}
+                        {% set r2 = resultados.get('g_' ~ letra.lower() ~ '_2', '') %}
+                        {% set r3 = resultados.get('g_' ~ letra.lower() ~ '_3', '') %}
+                        {% set clasificados_reales = [r1, r2, r3] | select | list %}
                         <div class="col-6 col-md-4 col-lg-3">
                             <div class="card shadow-sm h-100 border-0 bg-light">
                                 <div class="card-header bg-success text-white text-center fw-bold py-2">Grupo {{ letra }}</div>
                                 <div class="card-body p-2 text-center small">
-                                    <div class="fw-bold text-dark mb-1"><span class="text-success me-1">1º</span> {{ p1 or '—' }}</div>
-                                    <div class="fw-bold text-dark mb-1"><span class="text-primary me-1">2º</span> {{ p2 or '—' }}</div>
-                                    {% if p3 %}<div class="fw-bold text-muted"><span class="text-warning me-1">3º</span> {{ p3 }}</div>{% endif %}
+                                    {% if p1 %}
+                                    {% set c1 = 'pred-ok' if p1 == r1 else ('pred-fail' if r1 else 'pred-none') %}
+                                    <div class="fw-bold mb-1 rounded px-1 {{ c1 }}"><span class="me-1">1º</span>{{ p1 }}</div>
+                                    {% endif %}
+                                    {% if p2 %}
+                                    {% set c2 = 'pred-ok' if p2 == r2 else ('pred-fail' if r2 else 'pred-none') %}
+                                    <div class="fw-bold mb-1 rounded px-1 {{ c2 }}"><span class="me-1">2º</span>{{ p2 }}</div>
+                                    {% endif %}
+                                    {% if p3 %}
+                                    {% set c3 = 'pred-ok' if p3 == r3 else ('pred-fail' if r3 else 'pred-none') %}
+                                    <div class="fw-bold rounded px-1 {{ c3 }}"><span class="me-1">3º</span>{{ p3 }}</div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                     {% endfor %}
                 </div>
+
                 <h5 class="fw-bold text-secondary mb-3 border-top pt-4">Rondas Finales</h5>
                 <div class="row g-4">
+                    {% for ronda, label in [('octavos','Octavos de Final'),('cuartos','Cuartos de Final'),('semis','Semifinales'),('final','La Final')] %}
+                    {% set equipos_pred = predicciones.get('eliminatorias',{}).get(ronda, []) %}
+                    {% set equipos_real = resultados.get(ronda, []) %}
                     <div class="col-md-6">
-                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">Octavos de Final</h6>
+                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">{{ label }}</h6>
                         <div class="d-flex flex-wrap justify-content-center gap-1">
-                            {% for eq in predicciones.get('eliminatorias',{}).get('octavos', []) %}
-                                <span class="badge bg-white text-dark border border-secondary p-2">{{ eq }}</span>
+                            {% for eq in equipos_pred %}
+                                {% if equipos_real %}
+                                    {% set cls = 'pred-ok' if eq in equipos_real else 'pred-fail' %}
+                                {% else %}
+                                    {% set cls = 'pred-none' %}
+                                {% endif %}
+                                <span class="badge border p-2 {{ cls }}">{{ eq }}</span>
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">Cuartos de Final</h6>
-                        <div class="d-flex flex-wrap justify-content-center gap-1">
-                            {% for eq in predicciones.get('eliminatorias',{}).get('cuartos', []) %}
-                                <span class="badge bg-white text-dark border border-secondary p-2">{{ eq }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">Semifinales</h6>
-                        <div class="d-flex flex-wrap justify-content-center gap-2">
-                            {% for eq in predicciones.get('eliminatorias',{}).get('semis', []) %}
-                                <span class="badge bg-white text-dark border border-secondary p-2 fs-6">{{ eq }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="bg-success text-white p-2 rounded text-center fw-bold">La Final</h6>
-                        <div class="d-flex flex-wrap justify-content-center gap-3">
-                            {% for eq in predicciones.get('eliminatorias',{}).get('final', []) %}
-                                <span class="badge bg-white text-dark border border-success p-2 fs-5">{{ eq }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
+                    {% endfor %}
                 </div>
+
                 <div class="row mt-5 justify-content-center text-center bg-light p-4 rounded-4 shadow-sm mx-1">
+                    {% set pred_sub = predicciones.get('eliminatorias',{}).get('subcampeon', '') %}
+                    {% set pred_camp = predicciones.get('eliminatorias',{}).get('campeon', '') %}
+                    {% set pred_pich = predicciones.get('eliminatorias',{}).get('pichichi', '') %}
+                    {% set real_sub  = resultados.get('subcampeon', '') %}
+                    {% set real_camp = resultados.get('campeon', '') %}
+                    {% set real_pich = (resultados.get('pichichi', [''])[0] if resultados.get('pichichi') else '') %}
+
                     <div class="col-md-4 mb-3 mb-md-0 border-end border-2">
                         <h6 class="text-muted fw-bold mb-2">SUBCAMPEÓN</h6>
-                        <h4 class="fw-bold text-secondary m-0">{{ predicciones.get('eliminatorias',{}).get('subcampeon', '-') }}</h4>
+                        {% set cs = 'text-success' if (pred_sub and pred_sub == real_sub) else ('text-danger' if real_sub else 'text-secondary') %}
+                        <h4 class="fw-bold {{ cs }} m-0">{{ pred_sub or '-' }}
+                            {% if pred_sub and real_sub %}{% if pred_sub == real_sub %} ✅{% else %} ❌{% endif %}{% endif %}
+                        </h4>
                     </div>
                     <div class="col-md-4 mb-3 mb-md-0 border-end border-2">
                         <h6 class="text-warning fw-bold mb-2">🏆 CAMPEÓN MUNDIAL</h6>
-                        <h3 class="fw-bold text-success m-0">{{ predicciones.get('eliminatorias',{}).get('campeon', '-') }}</h3>
+                        {% set cc = 'text-success' if (pred_camp and pred_camp == real_camp) else ('text-danger' if real_camp else 'text-success') %}
+                        <h3 class="fw-bold {{ cc }} m-0">{{ pred_camp or '-' }}
+                            {% if pred_camp and real_camp %}{% if pred_camp == real_camp %} ✅{% else %} ❌{% endif %}{% endif %}
+                        </h3>
                     </div>
                     <div class="col-md-4">
                         <h6 class="text-primary fw-bold mb-2">⚽ PICHICHI</h6>
-                        <h4 class="fw-bold text-dark m-0">{{ predicciones.get('eliminatorias',{}).get('pichichi', '-') }}</h4>
+                        {% set cp = 'text-success' if (pred_pich and pred_pich.lower() == real_pich.lower()) else ('text-danger' if real_pich else 'text-dark') %}
+                        <h4 class="fw-bold {{ cp }} m-0">{{ pred_pich or '-' }}
+                            {% if pred_pich and real_pich %}{% if pred_pich.lower() == real_pich.lower() %} ✅{% else %} ❌{% endif %}{% endif %}
+                        </h4>
                     </div>
                 </div>
             </div>
@@ -1380,12 +1402,16 @@ def ver_prediccion(participant_id):
     if not _logged_in():
         return redirect(url_for("public.welcome"))
     try:
-        p = get_storage().get_participant_by_id(participant_id)
+        storage = get_storage()
+        p = storage.get_participant_by_id(participant_id)
+        results = storage.load_results()
     except Exception:
         return redirect(url_for("public.welcome"))
     if not p:
         return redirect(url_for("public.welcome"))
-    return _render("ver_prediccion", nombre=p["name"], predicciones=p.get("prediction") or {})
+    return _render("ver_prediccion", nombre=p["name"],
+                   predicciones=p.get("prediction") or {},
+                   resultados=results)
 
 
 @public_bp.route("/prediccion/grupos", methods=["GET", "POST"])
