@@ -181,6 +181,54 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
+        {% elif vista == 'ver_eliminatorias' %}
+        <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
+                <h3 class="m-0 fw-bold text-success">⚔️ Fase Eliminatoria</h3>
+                <a href="{{ url_for('public.welcome') }}" class="btn btn-outline-secondary fw-bold px-4">← Volver</a>
+            </div>
+            {% for ronda_label, partidos in rondas.items() %}
+            <h5 class="fw-bold text-success mb-3 mt-2">{{ ronda_label }}</h5>
+            <div class="row mb-4">
+                {% for p in partidos %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card shadow-sm border-0 {% if p.is_live %}border-warning border-2{% endif %}">
+                        <div class="card-body p-3">
+                            <div class="text-center text-muted small mb-2 fw-bold border-bottom pb-2 d-flex justify-content-between">
+                                <span>{{ p.fecha }} - {{ p.hora }}</span>
+                                {% if p.is_live %}
+                                    <span class="badge bg-danger">🔴 EN VIVO</span>
+                                {% elif p.is_finished %}
+                                    <span class="badge bg-secondary">Finalizado</span>
+                                {% else %}
+                                    <span class="badge bg-light text-muted border">Pendiente</span>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <div class="text-end" style="width:40%;">
+                                    <span class="fw-bold">{{ p.home.name if p.home.name != '?' else 'Por determinar' }}</span>
+                                    {% if p.home.flag %}<img src="https://flagcdn.com/w20/{{ p.home.flag }}.png" width="20" class="ms-1">{% endif %}
+                                </div>
+                                <div class="text-center fw-bold fs-5" style="width:20%;">
+                                    {% if p.is_finished or p.is_live %}
+                                        <span class="text-success">{{ p.home_score }} - {{ p.away_score }}</span>
+                                    {% else %}
+                                        <span class="text-muted">vs</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-start" style="width:40%;">
+                                    {% if p.away.flag %}<img src="https://flagcdn.com/w20/{{ p.away.flag }}.png" width="20" class="me-1">{% endif %}
+                                    <span class="fw-bold">{{ p.away.name if p.away.name != '?' else 'Por determinar' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
         {% elif vista == 'ver_grupos' %}
         <div class="card p-3 p-md-4 mx-auto mb-4 bg-transparent border-0 shadow-none" style="max-width: 1400px;">
             <div class="d-flex justify-content-between align-items-center border-bottom border-success pb-3 mb-4">
@@ -859,12 +907,46 @@ def ranking():
     return _render_ranking()
 
 
+_KNOCKOUT_STAGES = {"ROUND_OF_32","LAST_32","ROUND_OF_16","LAST_16","QUARTER_FINALS","SEMI_FINALS","FINAL","THIRD_PLACE"}
+_KNOCKOUT_ORDER  = ["ROUND_OF_32","LAST_32","ROUND_OF_16","LAST_16","QUARTER_FINALS","SEMI_FINALS","FINAL"]
+_KNOCKOUT_LABELS = {
+    "ROUND_OF_32":    "Dieciseisavos de Final",
+    "LAST_32":        "Dieciseisavos de Final",
+    "ROUND_OF_16":    "Octavos de Final",
+    "LAST_16":        "Octavos de Final",
+    "QUARTER_FINALS": "Cuartos de Final",
+    "SEMI_FINALS":    "Semifinales",
+    "FINAL":          "Final",
+    "THIRD_PLACE":    "3er y 4º Puesto",
+}
+
+
 @public_bp.route("/grupos")
 def ver_grupos():
     try:
-        results = get_storage().load_results()
+        storage  = get_storage()
+        results  = storage.load_results()
+        fixtures = storage.load_fixtures()
     except Exception:
-        results = {}
+        results, fixtures = {}, []
+
+    # Detect phase: are there any knockout fixtures (scheduled, live or finished)?
+    knockout_fixtures = [f for f in fixtures if f.get("stage","") in _KNOCKOUT_STAGES]
+    in_knockout = bool(knockout_fixtures)
+
+    if in_knockout:
+        # Group knockout fixtures by stage in order
+        from collections import OrderedDict
+        rondas = OrderedDict()
+        seen_stages = set()
+        for stage in _KNOCKOUT_ORDER + ["THIRD_PLACE"]:
+            matches = [f for f in knockout_fixtures if f.get("stage") == stage]
+            if matches and stage not in seen_stages:
+                seen_stages.add(stage)
+                rondas[_KNOCKOUT_LABELS[stage]] = matches
+        return _render("ver_eliminatorias", rondas=rondas)
+
+    # Group stage view
     grupos_fmt = _grupos_fmt()
     grupos_ordenados = {}
     for letra, equipos in grupos_fmt.items():
