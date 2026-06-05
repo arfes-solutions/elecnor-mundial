@@ -79,6 +79,14 @@ HTML_TEMPLATE = """
         }
         .nav-match-pill.live { background: rgba(220,53,69,0.25); border-color: rgba(220,53,69,0.5); }
 
+        /* Navbar desktop/mobile */
+        .nav-desktop { display:none; }
+        .nav-mobile  { display:flex; }
+        @media (min-width: 768px) {
+            .nav-desktop { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; }
+            .nav-mobile  { display:none; }
+        }
+
         /* Responsive */
         @media (max-width: 767px) {
             body { padding-top: 130px; }
@@ -100,7 +108,7 @@ HTML_TEMPLATE = """
         <div class="mx-auto" style="max-width:1400px;">
 
             <!-- DESKTOP: grid 3 columnas -->
-            <div class="d-none d-md-grid" style="display:grid!important;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;">
+            <div class="nav-desktop">
                 <div class="d-flex gap-2">
                     <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
                     <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">Reglas</button>
@@ -134,7 +142,7 @@ HTML_TEMPLATE = """
             </div>
 
             <!-- MOBILE: título + hamburguesa -->
-            <div class="d-flex d-md-none justify-content-between align-items-center">
+            <div class="nav-mobile justify-content-between align-items-center">
                 <div class="text-center flex-grow-1">
                     <h1 style="font-size:1.1rem;margin:0;font-weight:700;">PORRA MUNDIAL 2026</h1>
                     <p style="font-size:.7rem;margin:0;opacity:.85;">Elecnor Sistemas</p>
@@ -145,7 +153,7 @@ HTML_TEMPLATE = """
                 </button>
             </div>
             <!-- MOBILE: menú desplegable -->
-            <div class="collapse d-md-none" id="mobileMenu">
+            <div class="collapse" id="mobileMenu" style="display:none;">
                 <div class="d-flex flex-column gap-2 pt-2">
                     {% if live_matches %}{% set m = live_matches[0] %}
                     <div class="nav-match-pill live mx-auto">
