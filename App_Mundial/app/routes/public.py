@@ -1448,7 +1448,20 @@ def eliminatorias_fase():
             session.pop("pred_grupos", None)
             return redirect(url_for("public.welcome"))
         except Exception as exc:
-            return f"<h2>Error al guardar eliminatorias</h2><pre>nombre={nombre!r}\nerror={exc}</pre>", 500
+            # Show error in the form so user can retry
+            grupos_data = session.get("pred_grupos", {})
+            clasificados = []
+            seen = set()
+            for letra in "ABCDEFGHIJKL":
+                for pos in ("1", "2", "3"):
+                    eq = grupos_data.get(f"g_{letra}_{pos}", "")
+                    if eq and eq not in seen:
+                        clasificados.append(eq)
+                        seen.add(eq)
+            return _render("prediccion_completa",
+                           grupos=_grupos_fmt(), saved=grupos_data,
+                           nombre=nombre, clasificados=clasificados,
+                           elim_error=f"Error al guardar: {exc}. Inténtalo de nuevo.")
     # Should not reach here normally, redirect back to grupos
     return redirect(url_for("public.grupos_fase"))
 

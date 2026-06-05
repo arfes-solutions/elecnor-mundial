@@ -54,11 +54,23 @@ def save_prediction_by_name(name, prediction):
     """Upsert a participant by name (no email/password needed)."""
     dummy_email = name.strip().lower().replace(" ", ".") + "@elecnor.local"
     h = {**_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
-    _check(requests.post(
+    # Use PATCH to update existing row, or POST with on_conflict for upsert
+    # First try to update existing row
+    r = requests.patch(
         _url("participants"),
-        headers=h,
-        json={"name": name.strip(), "email": dummy_email, "prediction_json": prediction},
-    ))
+        headers=_headers(),
+        params={"name": f"eq.{name.strip()}"},
+        json={"prediction_json": prediction},
+    )
+    if r.status_code == 404 or (r.status_code == 200 and r.text == "[]"):
+        # Row doesn't exist yet, insert it
+        _check(requests.post(
+            _url("participants") + "?on_conflict=name",
+            headers=h,
+            json={"name": name.strip(), "email": dummy_email, "prediction_json": prediction},
+        ))
+    else:
+        _check(r)
 
 
 def load_participants_full():
