@@ -139,7 +139,7 @@ WELCOME_TEMPLATE = """<!doctype html><html lang="es"><head>
   }
 </style>
 </head><body>
-{{ topbar }}
+{{ topbar | safe }}
 <main class="shell">
   <section class="card">
     <div class="hero">
@@ -245,7 +245,7 @@ RANKING_TEMPLATE = """<!doctype html><html lang="es"><head>
   }
 </style>
 </head><body>
-{{ topbar }}
+{{ topbar | safe }}
 <main class="shell">
   <section class="card">
     <div class="rh">
@@ -313,7 +313,7 @@ GRUPOS_TEMPLATE = """<!doctype html><html lang="es"><head>
   .badge-fail{background:#fde8e4;color:#8b2215;}
 </style>
 </head><body>
-{{ topbar }}
+{{ topbar | safe }}
 <main class="shell">
   <section class="card">
     <div class="section-header">
@@ -426,7 +426,7 @@ ELIM_TEMPLATE = """<!doctype html><html lang="es"><head>
     padding:16px 20px;text-align:center;}
 </style>
 </head><body>
-{{ topbar }}
+{{ topbar | safe }}
 <main class="shell">
   <section class="card">
     <div class="section-header">
@@ -600,7 +600,7 @@ VER_TEMPLATE = """<!doctype html><html lang="es"><head>
   .finale-block.champion strong{font-size:1.35rem;color:var(--pitch);}
 </style>
 </head><body>
-{{ topbar }}
+{{ topbar | safe }}
 <main class="shell">
   <section class="card">
     <div class="section-header">
