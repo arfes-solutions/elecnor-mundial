@@ -97,39 +97,40 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="header-banner">
-        <div class="d-flex flex-wrap justify-content-between align-items-center mx-auto gap-2" style="max-width: 1400px;">
-            <div class="d-flex gap-2 flex-shrink-0">
+        <div class="mx-auto" style="max-width:1400px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;">
+            <!-- Izquierda -->
+            <div class="d-flex gap-2">
                 <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
                 <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">Reglas</button>
             </div>
 
-            <div class="text-center flex-grow-1 d-none d-md-block">
+            <!-- Centro: siempre centrado -->
+            <div class="text-center">
                 <h1>PORRA MUNDIAL 2026</h1>
                 <p>Elecnor Sistemas</p>
             </div>
 
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                {# Widget próximo partido / EN VIVO entre título y botones #}
+            <!-- Derecha: widget + botones -->
+            <div class="d-flex align-items-center gap-2 justify-content-end">
                 {% if live_matches %}
                     {% set m = live_matches[0] %}
                     <div class="nav-match-pill live d-none d-md-flex">
                         <span style="animation:pulse 1s infinite">🔴</span>
-                        {% if m.home.flag %}<img src="https://flagcdn.com/w16/{{ m.home.flag }}.png" height="12">{% endif %}
+                        {% if m.home.flag %}<img src="https://flagcdn.com/w40/{{ m.home.flag }}.png" height="14" style="border-radius:2px;">{% endif %}
                         <strong>{{ m.home_score }}-{{ m.away_score }}</strong>
-                        {% if m.away.flag %}<img src="https://flagcdn.com/w16/{{ m.away.flag }}.png" height="12">{% endif %}
+                        {% if m.away.flag %}<img src="https://flagcdn.com/w40/{{ m.away.flag }}.png" height="14" style="border-radius:2px;">{% endif %}
                     </div>
                 {% elif next_match %}
-                    <div class="nav-match-pill d-none d-md-flex flex-column align-items-center" style="line-height:1.2;">
-                        <span style="opacity:.75;font-size:.6rem;">Próximo</span>
-                        <span>
-                            {% if next_match.home.flag %}<img src="https://flagcdn.com/w16/{{ next_match.home.flag }}.png" height="11">{% endif %}
-                            vs
-                            {% if next_match.away.flag %}<img src="https://flagcdn.com/w16/{{ next_match.away.flag }}.png" height="11">{% endif %}
-                            · <span id="countdown-nav">--:--</span>
+                    <div class="nav-match-pill d-none d-md-flex flex-column align-items-center" style="line-height:1.3;">
+                        <span style="opacity:.75;font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;">Próximo</span>
+                        <span style="display:flex;align-items:center;gap:4px;">
+                            {% if next_match.home.flag %}<img src="https://flagcdn.com/w40/{{ next_match.home.flag }}.png" height="13" style="border-radius:2px;">{% endif %}
+                            <span style="opacity:.7;">vs</span>
+                            {% if next_match.away.flag %}<img src="https://flagcdn.com/w40/{{ next_match.away.flag }}.png" height="13" style="border-radius:2px;">{% endif %}
+                            · <span id="countdown-nav" style="font-weight:700;">--:--</span>
                         </span>
                     </div>
                 {% endif %}
-
                 <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
                 <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
             </div>
