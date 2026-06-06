@@ -1167,6 +1167,8 @@ def welcome():
 
 SHARED_USERNAME = "Elecnor"
 SHARED_PASSWORD = "Mundial26"
+ADMIN_USERNAME = "Admin"
+ADMIN_PASSWORD = "Elecnoradmin"
 
 
 def _authenticated():
@@ -1180,9 +1182,14 @@ def _require_auth():
 def login():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
+    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        session["authenticated"] = True
+        session["is_admin"] = True
+        return redirect(url_for("public.admin_panel"))
     if username.lower() != SHARED_USERNAME.lower() or password != SHARED_PASSWORD:
         return _render("login_register", auth_error="Usuario o contraseña incorrectos.")
     session["authenticated"] = True
+    session["is_admin"] = False
     return redirect(url_for("public.welcome"))
 
 
@@ -1504,13 +1511,12 @@ def eliminatorias_fase():
 # ADMIN
 # ---------------------------------------------------------------------------
 @public_bp.route("/admin", methods=["GET", "POST"])
-def admin():
+def admin_panel():
     from flask import current_app
 
-    # Admin is accessible to anyone logged in with Elecnor/Mundial26
-    authed = session.get("authenticated", False)
-    if not authed:
+    if not session.get("is_admin"):
         return redirect(url_for("public.welcome"))
+    authed = True
 
     msg, ok, error = None, False, None
 

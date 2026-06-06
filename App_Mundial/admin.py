@@ -1,11 +1,13 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template_string, request, session, redirect, url_for
 import os
 import json
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('ADMIN_SECRET_KEY', 'cambia-esto-en-produccion-xK9#mP2!')
 
 # --- CONFIGURACIÓN PRINCIPAL ---
 RUTA_RESULTADOS = 'resultados.txt'
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'mundial2026')
 
 # --- DATOS DEL TORNEO ---
 GRUPOS = {
@@ -22,6 +24,47 @@ GRUPOS = {
     'K': [('pt', 'Portugal'), ('cd', 'RD Congo'), ('uz', 'Uzbekistán'), ('co', 'Colombia')],
     'L': [('gb-eng', 'Inglaterra'), ('hr', 'Croacia'), ('gh', 'Ghana'), ('pa', 'Panamá')]
 }
+
+# ==========================================
+# PLANTILLA HTML DE LOGIN
+# ==========================================
+HTML_LOGIN = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Admin · Porra Mundial</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f2f9f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .login-card { background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 2.5rem; width: 100%; max-width: 400px; }
+        .header-banner { background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); color: white; padding: 1.2rem; border-radius: 12px; text-align: center; margin-bottom: 2rem; }
+        .btn-primary-custom { background-color: #2563eb; border: none; border-radius: 8px; width: 100%; padding: 0.75rem; font-weight: 600; font-size: 1rem; }
+        .btn-primary-custom:hover { background-color: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="header-banner">
+            <h1 style="font-size:1.8rem; font-weight:700; margin:0;">⚙️ Admin</h1>
+            <p class="m-0 mt-1 opacity-75 small">Panel de Control · Porra Mundial</p>
+        </div>
+        {% if error %}
+        <div class="alert alert-danger text-center small">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Contraseña</label>
+                <input type="password" name="password" class="form-control form-control-lg" autofocus required>
+            </div>
+            <button type="submit" class="btn btn-primary-custom text-white">Entrar</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
 
 # ==========================================
 # PLANTILLA HTML DEL PANEL DE ADMINISTRADOR
@@ -55,9 +98,10 @@ HTML_ADMIN = """
 <body>
     <div class="container-fluid px-4 mt-4 mb-5">
         
-        <div class="header-banner text-center mb-4 mx-auto" style="max-width: 1200px;">
+        <div class="header-banner text-center mb-4 mx-auto position-relative" style="max-width: 1200px;">
             <h1>⚙️ PANEL DE ADMINISTRADOR</h1>
             <p class="m-0 mt-1 opacity-75">Actualiza los resultados reales con botones interactivos</p>
+            <a href="/logout" class="btn btn-sm btn-outline-light position-absolute top-50 end-0 translate-middle-y me-3">Cerrar sesión</a>
         </div>
 
         {% if mensaje %}
@@ -297,17 +341,37 @@ def escribir_archivo_txt(datos_form):
 # ==========================================
 # RUTAS DE LA APLICACIÓN
 # ==========================================
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('autenticado'):
+        return redirect(url_for('admin_panel'))
+    error = None
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['autenticado'] = True
+            return redirect(url_for('admin_panel'))
+        error = 'Contraseña incorrecta. Inténtalo de nuevo.'
+    return render_template_string(HTML_LOGIN, error=error)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/', methods=['GET', 'POST'])
 def admin_panel():
+    if not session.get('autenticado'):
+        return redirect(url_for('login'))
+
     mensaje = ""
     if request.method == 'POST':
         escribir_archivo_txt(request.form)
         mensaje = "¡Resultados guardados y actualizados correctamente! La web principal ya tiene los nuevos puntos."
-        
+
     posiciones_actuales, extras_actuales = leer_archivo_txt()
-    return render_template_string(HTML_ADMIN, 
-                                  grupos=GRUPOS, 
-                                  posiciones_actuales=posiciones_actuales, 
+    return render_template_string(HTML_ADMIN,
+                                  grupos=GRUPOS,
+                                  posiciones_actuales=posiciones_actuales,
                                   extras=extras_actuales,
                                   mensaje=mensaje)
 
