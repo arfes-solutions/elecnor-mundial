@@ -779,11 +779,16 @@ HTML_TEMPLATE = """
         </div>
         <style>
             .mu-card { background:#fff; border:1px solid #dee2e6; border-radius:10px; padding:10px 12px; text-align:center; height:100%; }
+            .mu-card.mu-l { border-left:3px solid #198754; }
+            .mu-card.mu-r { border-left:3px solid #0d6efd; }
             .mu-team { display:flex; align-items:center; gap:6px; justify-content:center; padding:4px 0; font-weight:600; font-size:.88rem; }
             .mu-flag { width:22px; height:16px; border-radius:2px; object-fit:cover; flex-shrink:0; }
             .mu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; }
             .mu-vs { font-size:.72rem; color:#adb5bd; font-weight:700; letter-spacing:.05em; padding:1px 0; }
             .mu-tbd { font-style:italic; color:#adb5bd; font-size:.78rem; padding:4px 0; }
+            .mu-path-header { font-size:.8rem; font-weight:700; padding:4px 10px; border-radius:6px; display:inline-block; margin-bottom:6px; }
+            .mu-path-l { background:#d1e7dd; color:#0f5132; }
+            .mu-path-r { background:#cfe2ff; color:#084298; }
         </style>
         <script>
             const savedGroups = {{ saved | tojson }};
@@ -803,25 +808,29 @@ HTML_TEMPLATE = """
                 "Inglaterra":"gb-eng","Croacia":"hr","Ghana":"gh","Panamá":"pa",
             };
 
-            /* 16 R32 matchups: home/away defined by group position */
-            const MATCHUPS_R32 = [
-                {h:{p:'2',g:'A'}, a:{p:'2',g:'B'}},
-                {h:{p:'1',g:'E'}, a:{p:'3',g:null}},
-                {h:{p:'1',g:'F'}, a:{p:'2',g:'C'}},
-                {h:{p:'1',g:'C'}, a:{p:'2',g:'F'}},
-                {h:{p:'1',g:'I'}, a:{p:'3',g:null}},
-                {h:{p:'2',g:'E'}, a:{p:'2',g:'I'}},
-                {h:{p:'1',g:'A'}, a:{p:'3',g:null}},
-                {h:{p:'1',g:'L'}, a:{p:'3',g:null}},
-                {h:{p:'1',g:'D'}, a:{p:'3',g:null}},
-                {h:{p:'1',g:'G'}, a:{p:'3',g:null}},
-                {h:{p:'2',g:'K'}, a:{p:'2',g:'L'}},
-                {h:{p:'1',g:'H'}, a:{p:'2',g:'J'}},
-                {h:{p:'1',g:'B'}, a:{p:'3',g:null}},
-                {h:{p:'1',g:'J'}, a:{p:'2',g:'H'}},
-                {h:{p:'1',g:'K'}, a:{p:'3',g:null}},
-                {h:{p:'2',g:'D'}, a:{p:'2',g:'G'}},
-            ];
+            /* 16 R32 matchups grouped by pathway (L = Camino 1, R = Camino 2) */
+            const MATCHUPS_R32 = {
+                L: [
+                    {h:{p:'2',g:'A'}, a:{p:'2',g:'B'}},
+                    {h:{p:'1',g:'E'}, a:{p:'3',g:null}},
+                    {h:{p:'1',g:'F'}, a:{p:'2',g:'C'}},
+                    {h:{p:'1',g:'I'}, a:{p:'3',g:null}},
+                    {h:{p:'2',g:'K'}, a:{p:'2',g:'L'}},
+                    {h:{p:'1',g:'H'}, a:{p:'2',g:'J'}},
+                    {h:{p:'1',g:'D'}, a:{p:'3',g:null}},
+                    {h:{p:'1',g:'G'}, a:{p:'3',g:null}},
+                ],
+                R: [
+                    {h:{p:'1',g:'C'}, a:{p:'2',g:'F'}},
+                    {h:{p:'2',g:'E'}, a:{p:'2',g:'I'}},
+                    {h:{p:'1',g:'A'}, a:{p:'3',g:null}},
+                    {h:{p:'1',g:'L'}, a:{p:'3',g:null}},
+                    {h:{p:'1',g:'J'}, a:{p:'2',g:'H'}},
+                    {h:{p:'2',g:'D'}, a:{p:'2',g:'G'}},
+                    {h:{p:'1',g:'B'}, a:{p:'3',g:null}},
+                    {h:{p:'1',g:'K'}, a:{p:'3',g:null}},
+                ],
+            };
 
             function teamSlotHTML(slot) {
                 if (!slot.g) return `<div class="mu-tbd">Tercero por determinar</div>`;
@@ -832,18 +841,24 @@ HTML_TEMPLATE = """
                 return `<div class="mu-team">${flag}<span class="mu-name">${name}</span></div>`;
             }
 
+            function matchupCard(m, path) {
+                return `<div class="col-6 col-md-3">
+                    <div class="mu-card mu-${path.toLowerCase()}">
+                        ${teamSlotHTML(m.h)}
+                        <div class="mu-vs">vs</div>
+                        ${teamSlotHTML(m.a)}
+                    </div>
+                </div>`;
+            }
+
             function renderMatchups() {
                 const cont = document.getElementById('matchups-r32');
                 if (!cont) return;
-                cont.innerHTML = MATCHUPS_R32.map(m =>
-                    `<div class="col-6 col-md-4 col-lg-3">
-                        <div class="mu-card">
-                            ${teamSlotHTML(m.h)}
-                            <div class="mu-vs">vs</div>
-                            ${teamSlotHTML(m.a)}
-                        </div>
-                    </div>`
-                ).join('');
+                cont.innerHTML =
+                    `<div class="col-12 mt-1"><span class="mu-path-header mu-path-l">⬅ Camino 1</span></div>` +
+                    MATCHUPS_R32.L.map(m => matchupCard(m,'L')).join('') +
+                    `<div class="col-12 mt-3"><span class="mu-path-header mu-path-r">Camino 2 ➡</span></div>` +
+                    MATCHUPS_R32.R.map(m => matchupCard(m,'R')).join('');
             }
 
             function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
