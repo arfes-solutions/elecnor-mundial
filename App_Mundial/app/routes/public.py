@@ -769,95 +769,103 @@ HTML_TEMPLATE = """
             </form>
         </div>
         <style>
-            .match-card { border-radius:10px; background:#f8f9fa; border:1px solid #dee2e6; padding:8px; }
-            .match-id { font-size:.6rem; color:#adb5bd; text-align:center; margin-bottom:4px; letter-spacing:.05em; }
-            .match-vs { text-align:center; font-size:.65rem; color:#6c757d; font-weight:700; margin:2px 0; }
-            .tbd-slot { background:white; border:1px dashed #adb5bd; border-radius:8px; padding:6px 4px; text-align:center; font-size:.72rem; color:#adb5bd; font-style:italic; }
-            .team-label { font-size:.78rem; padding:6px 4px; }
+            .bracket-layout { display:flex; gap:12px; align-items:flex-start; }
+            .bracket-half { flex:1; display:flex; flex-direction:column; gap:10px; min-width:0; }
+            .bracket-half-title { text-align:center; font-weight:700; font-size:.8rem; background:#198754; color:white; padding:5px 8px; border-radius:6px; margin-bottom:2px; }
+            .b-pair { display:flex; gap:6px; align-items:stretch; }
+            .b-matches { flex:1; display:flex; flex-direction:column; gap:6px; min-width:0; }
+            /* Bracket arm – right side (left pathway) */
+            .bracket-left .b-pair .b-arm { width:18px; flex-shrink:0; display:flex; flex-direction:column; }
+            .bracket-left .b-pair .b-arm-inner { flex:1; border-top:2px solid #198754; border-right:2px solid #198754; border-bottom:2px solid #198754; border-radius:0 6px 6px 0; }
+            .bracket-left .b-pair .b-arm-label { font-size:.55rem; color:#198754; font-weight:700; writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg); white-space:nowrap; margin-top:2px; text-align:center; }
+            /* Bracket arm – left side (right pathway) */
+            .bracket-right .b-pair { flex-direction:row-reverse; }
+            .bracket-right .b-pair .b-arm { width:18px; flex-shrink:0; display:flex; flex-direction:column; }
+            .bracket-right .b-pair .b-arm-inner { flex:1; border-top:2px solid #198754; border-left:2px solid #198754; border-bottom:2px solid #198754; border-radius:6px 0 0 6px; }
+            .bracket-right .b-pair .b-arm-label { font-size:.55rem; color:#198754; font-weight:700; writing-mode:vertical-rl; text-orientation:mixed; white-space:nowrap; margin-top:2px; text-align:center; }
+            /* Match card */
+            .b-match { background:#f8f9fa; border:1px solid #dee2e6; border-radius:8px; padding:6px; }
+            .b-match-id { font-size:.55rem; color:#adb5bd; text-align:center; margin-bottom:3px; letter-spacing:.04em; }
+            .b-vs { text-align:center; font-size:.6rem; color:#adb5bd; font-weight:700; margin:1px 0; }
+            .b-tbd { background:white; border:1px dashed #ced4da; border-radius:6px; padding:4px; text-align:center; font-size:.65rem; color:#adb5bd; font-style:italic; line-height:1.2; }
+            .team-label { font-size:.75rem; padding:5px 4px; }
+            @media (max-width:767px) {
+                .bracket-layout { flex-direction:column; }
+                .b-arm-label { writing-mode:horizontal-tb; transform:none; font-size:.6rem; }
+            }
         </style>
         <script>
             const savedGroups = {{ saved | tojson }};
 
-            const BRACKET = [
-                {sec:'Camino 1 · Superior', matches:[
-                    {id:'M73',home:{p:'2',g:'A'},away:{p:'2',g:'B'}},
-                    {id:'M74',home:{p:'1',g:'E'},away:{p:'3',g:null}},
-                    {id:'M75',home:{p:'1',g:'F'},away:{p:'2',g:'C'}},
-                    {id:'M77',home:{p:'1',g:'I'},away:{p:'3',g:null}},
-                ]},
-                {sec:'Camino 1 · Inferior', matches:[
-                    {id:'M83',home:{p:'2',g:'K'},away:{p:'2',g:'L'}},
-                    {id:'M84',home:{p:'1',g:'H'},away:{p:'2',g:'J'}},
-                    {id:'M81',home:{p:'1',g:'D'},away:{p:'3',g:null}},
-                    {id:'M82',home:{p:'1',g:'G'},away:{p:'3',g:null}},
-                ]},
-                {sec:'Camino 2 · Superior', matches:[
-                    {id:'M76',home:{p:'1',g:'C'},away:{p:'2',g:'F'}},
-                    {id:'M78',home:{p:'2',g:'E'},away:{p:'2',g:'I'}},
-                    {id:'M79',home:{p:'1',g:'A'},away:{p:'3',g:null}},
-                    {id:'M80',home:{p:'1',g:'L'},away:{p:'3',g:null}},
-                ]},
-                {sec:'Camino 2 · Inferior', matches:[
-                    {id:'M86',home:{p:'1',g:'J'},away:{p:'2',g:'H'}},
-                    {id:'M88',home:{p:'2',g:'D'},away:{p:'2',g:'G'}},
-                    {id:'M85',home:{p:'1',g:'B'},away:{p:'3',g:null}},
-                    {id:'M87',home:{p:'1',g:'K'},away:{p:'3',g:null}},
-                ]},
+            const PAIRS_P1 = [
+                {r16:'R16',m:[{id:'M73',h:{p:'2',g:'A'},a:{p:'2',g:'B'}},{id:'M74',h:{p:'1',g:'E'},a:{p:'3',g:null}}]},
+                {r16:'R16',m:[{id:'M75',h:{p:'1',g:'F'},a:{p:'2',g:'C'}},{id:'M77',h:{p:'1',g:'I'},a:{p:'3',g:null}}]},
+                {r16:'R16',m:[{id:'M83',h:{p:'2',g:'K'},a:{p:'2',g:'L'}},{id:'M84',h:{p:'1',g:'H'},a:{p:'2',g:'J'}}]},
+                {r16:'R16',m:[{id:'M81',h:{p:'1',g:'D'},a:{p:'3',g:null}},{id:'M82',h:{p:'1',g:'G'},a:{p:'3',g:null}}]},
+            ];
+            const PAIRS_P2 = [
+                {r16:'R16',m:[{id:'M76',h:{p:'1',g:'C'},a:{p:'2',g:'F'}},{id:'M78',h:{p:'2',g:'E'},a:{p:'2',g:'I'}}]},
+                {r16:'R16',m:[{id:'M79',h:{p:'1',g:'A'},a:{p:'3',g:null}},{id:'M80',h:{p:'1',g:'L'},a:{p:'3',g:null}}]},
+                {r16:'R16',m:[{id:'M86',h:{p:'1',g:'J'},a:{p:'2',g:'H'}},{id:'M88',h:{p:'2',g:'D'},a:{p:'2',g:'G'}}]},
+                {r16:'R16',m:[{id:'M85',h:{p:'1',g:'B'},a:{p:'3',g:null}},{id:'M87',h:{p:'1',g:'K'},a:{p:'3',g:null}}]},
             ];
 
-            function teamName(p, g) {
-                if (!g) return null;
-                return savedGroups['g_' + g + '_' + p] || (p + 'º Grupo ' + g);
+            function tn(p,g){ return g ? (savedGroups['g_'+g+'_'+p] || p+'º Gr.'+g) : null; }
+
+            function matchCard(m) {
+                const hn = tn(m.h.p, m.h.g);
+                const isTBD = m.a.p === '3';
+                const an = isTBD ? null : tn(m.a.p, m.a.g);
+                const slot = (name, side) => {
+                    const uid = 'oct_'+m.id+'_'+side;
+                    return `<input type="checkbox" name="octavos" value="${name}" id="${uid}" class="team-checkbox chk-octavos">
+                            <label for="${uid}" class="team-label d-block text-truncate m-0">${name}</label>`;
+                };
+                return `<div class="b-match">
+                    <div class="b-match-id">${m.id} · ${m.h.p}º${m.h.g} vs ${isTBD ? '3º?' : m.a.p+'º'+m.a.g}</div>
+                    ${hn ? slot(hn,'h') : ''}
+                    <div class="b-vs">vs</div>
+                    ${isTBD ? '<div class="b-tbd">Por determinar<br><span style="font-size:.55rem">(mejor 3º)</span></div>' : (an ? slot(an,'a') : '')}
+                </div>`;
             }
 
-            function teamSlot(name, matchId, side) {
-                const uid = 'oct_' + matchId + '_' + side;
-                return `<input type="checkbox" name="octavos" value="${name}" id="${uid}" class="team-checkbox chk-octavos">
-                        <label for="${uid}" class="team-label d-block text-truncate m-0">${name}</label>`;
+            function renderHalf(pairs, side) {
+                return pairs.map(pair =>
+                    `<div class="b-pair">
+                        <div class="b-matches">${pair.m.map(matchCard).join('')}</div>
+                        <div class="b-arm">
+                            <div class="b-arm-inner"></div>
+                            <div class="b-arm-label">${pair.r16}</div>
+                        </div>
+                    </div>`
+                ).join('');
             }
 
             function renderBracket() {
-                const container = document.getElementById('bracket-container');
-                const terGrid = document.getElementById('grid-terceros');
-                let html = '';
+                document.getElementById('bracket-container').innerHTML = `
+                    <div class="bracket-layout">
+                        <div class="bracket-half bracket-left">
+                            <div class="bracket-half-title">⬅ Camino 1</div>
+                            ${renderHalf(PAIRS_P1,'left')}
+                        </div>
+                        <div class="bracket-half bracket-right">
+                            <div class="bracket-half-title">Camino 2 ➡</div>
+                            ${renderHalf(PAIRS_P2,'right')}
+                        </div>
+                    </div>`;
 
-                BRACKET.forEach(section => {
-                    html += `<div class="col-md-6 col-lg-3">
-                        <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-success text-white fw-bold text-center py-2" style="font-size:.8rem;">${section.sec}</div>
-                        <div class="card-body p-2 d-flex flex-column gap-2">`;
-
-                    section.matches.forEach(m => {
-                        const hn = teamName(m.home.p, m.home.g);
-                        const an = teamName(m.away.p, m.away.g);
-                        const isTBD = m.away.p === '3';
-                        html += `<div class="match-card">
-                            <div class="match-id">${m.id} · ${m.home.p}º ${m.home.g} vs ${isTBD ? '3º ?' : m.away.p + 'º ' + m.away.g}</div>
-                            ${hn ? teamSlot(hn, m.id, 'h') : ''}
-                            <div class="match-vs">vs</div>
-                            ${isTBD ? '<div class="tbd-slot">Por determinar<br>(mejor 3º)</div>' : (an ? teamSlot(an, m.id, 'a') : '')}
-                        </div>`;
-                    });
-
-                    html += `</div></div></div>`;
-                });
-
-                container.innerHTML = html;
-
-                // Render thirds pool
                 const terceros = [];
                 for (const g of 'ABCDEFGHIJKL') {
-                    const t = savedGroups['g_' + g + '_3'];
+                    const t = savedGroups['g_'+g+'_3'];
                     if (t) terceros.push(t);
                 }
-                terGrid.innerHTML = terceros.map((eq, i) =>
+                document.getElementById('grid-terceros').innerHTML = terceros.map((eq,i) =>
                     `<div class="col-6 col-md-3 col-lg-2">
                         <input type="checkbox" name="octavos" value="${eq}" id="oct_ter_${i}" class="team-checkbox chk-octavos">
                         <label class="team-label text-truncate" for="oct_ter_${i}">${eq}</label>
                     </div>`
                 ).join('');
 
-                // Attach events
                 document.querySelectorAll('.chk-octavos').forEach(chk => {
                     chk.addEventListener('change', updateOctavos);
                 });
