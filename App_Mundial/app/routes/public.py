@@ -728,7 +728,13 @@ HTML_TEMPLATE = """
             <form method="POST" action="{{ url_for('public.eliminatorias_fase') }}" id="form-eliminatorias">
                 <div id="sec-octavos" class="fase-section fase-active mb-5">
                     <h5 class="bg-success text-white p-2 rounded text-center">1. Dieciseisavos de Final · ¿Quién pasa?</h5>
-                    <p class="text-center text-muted small mb-3">Marca libremente los equipos que crees que avanzan. Puedes marcar los dos de un partido, uno solo, o ninguno.</p>
+                    <div class="mb-4">
+                        <h6 class="text-center fw-bold text-success mb-1">🏟️ Emparejamientos de Dieciseisavos</h6>
+                        <p class="text-center text-muted small mb-3">Así quedan los cruces iniciales basados en tus predicciones de la Fase de Grupos.</p>
+                        <div class="row g-2" id="matchups-r32"></div>
+                    </div>
+                    <hr>
+                    <p class="text-center text-muted small mb-2">Ahora marca libremente los equipos que crees que pasan. Puedes marcar los dos de un partido, uno solo, o ninguno.</p>
                     <div class="text-center mb-3"><span id="count-octavos" class="badge bg-warning text-dark fs-6">0 / 16 seleccionados</span></div>
                     <div class="row g-2" id="bracket-container"></div>
                 </div>
@@ -763,8 +769,74 @@ HTML_TEMPLATE = """
                 </div>
             </form>
         </div>
+        <style>
+            .mu-card { background:#fff; border:1px solid #dee2e6; border-radius:10px; padding:10px 12px; text-align:center; height:100%; }
+            .mu-team { display:flex; align-items:center; gap:6px; justify-content:center; padding:4px 0; font-weight:600; font-size:.88rem; }
+            .mu-flag { width:22px; height:16px; border-radius:2px; object-fit:cover; flex-shrink:0; }
+            .mu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; }
+            .mu-vs { font-size:.72rem; color:#adb5bd; font-weight:700; letter-spacing:.05em; padding:1px 0; }
+            .mu-tbd { font-style:italic; color:#adb5bd; font-size:.78rem; padding:4px 0; }
+        </style>
         <script>
             const savedGroups = {{ saved | tojson }};
+
+            const FLAG_MAP = {
+                "México":"mx","Sudáfrica":"za","Corea del Sur":"kr","Chequia":"cz",
+                "Canadá":"ca","Bosnia y Herzegovina":"ba","Qatar":"qa","Suiza":"ch",
+                "Brasil":"br","Marruecos":"ma","Haití":"ht","Escocia":"gb-sct",
+                "Estados Unidos":"us","Paraguay":"py","Australia":"au","Turquía":"tr",
+                "Alemania":"de","Curazao":"cw","Costa de Marfil":"ci","Ecuador":"ec",
+                "Países Bajos":"nl","Japón":"jp","Suecia":"se","Túnez":"tn",
+                "Bélgica":"be","Egipto":"eg","Irán":"ir","Nueva Zelanda":"nz",
+                "España":"es","Cabo Verde":"cv","Arabia Saudita":"sa","Uruguay":"uy",
+                "Francia":"fr","Senegal":"sn","Irak":"iq","Noruega":"no",
+                "Argentina":"ar","Argelia":"dz","Austria":"at","Jordania":"jo",
+                "Portugal":"pt","RD Congo":"cd","Uzbekistán":"uz","Colombia":"co",
+                "Inglaterra":"gb-eng","Croacia":"hr","Ghana":"gh","Panamá":"pa",
+            };
+
+            /* 16 R32 matchups: home/away defined by group position */
+            const MATCHUPS_R32 = [
+                {h:{p:'2',g:'A'}, a:{p:'2',g:'B'}},
+                {h:{p:'1',g:'E'}, a:{p:'3',g:null}},
+                {h:{p:'1',g:'F'}, a:{p:'2',g:'C'}},
+                {h:{p:'1',g:'C'}, a:{p:'2',g:'F'}},
+                {h:{p:'1',g:'I'}, a:{p:'3',g:null}},
+                {h:{p:'2',g:'E'}, a:{p:'2',g:'I'}},
+                {h:{p:'1',g:'A'}, a:{p:'3',g:null}},
+                {h:{p:'1',g:'L'}, a:{p:'3',g:null}},
+                {h:{p:'1',g:'D'}, a:{p:'3',g:null}},
+                {h:{p:'1',g:'G'}, a:{p:'3',g:null}},
+                {h:{p:'2',g:'K'}, a:{p:'2',g:'L'}},
+                {h:{p:'1',g:'H'}, a:{p:'2',g:'J'}},
+                {h:{p:'1',g:'B'}, a:{p:'3',g:null}},
+                {h:{p:'1',g:'J'}, a:{p:'2',g:'H'}},
+                {h:{p:'1',g:'K'}, a:{p:'3',g:null}},
+                {h:{p:'2',g:'D'}, a:{p:'2',g:'G'}},
+            ];
+
+            function teamSlotHTML(slot) {
+                if (!slot.g) return `<div class="mu-tbd">Tercero por determinar</div>`;
+                const name = savedGroups['g_'+slot.g+'_'+slot.p];
+                if (!name) return `<div class="mu-tbd">${slot.p}º Grupo ${slot.g}</div>`;
+                const code = FLAG_MAP[name] || '';
+                const flag = code ? `<img class="mu-flag" src="https://flagcdn.com/20x15/${code}.png" alt="">` : '';
+                return `<div class="mu-team">${flag}<span class="mu-name">${name}</span></div>`;
+            }
+
+            function renderMatchups() {
+                const cont = document.getElementById('matchups-r32');
+                if (!cont) return;
+                cont.innerHTML = MATCHUPS_R32.map(m =>
+                    `<div class="col-6 col-md-4 col-lg-3">
+                        <div class="mu-card">
+                            ${teamSlotHTML(m.h)}
+                            <div class="mu-vs">vs</div>
+                            ${teamSlotHTML(m.a)}
+                        </div>
+                    </div>`
+                ).join('');
+            }
 
             function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
                 const checkboxes = document.querySelectorAll('.' + origenClase);
@@ -815,6 +887,7 @@ HTML_TEMPLATE = """
                 document.getElementById('btn-finalizar').classList.add('d-none');
             }
             document.addEventListener('DOMContentLoaded', function() {
+                renderMatchups();
                 const grupos = 'ABCDEFGHIJKL'.split('');
                 const contenedor = document.getElementById('bracket-container');
                 grupos.forEach(g => {
