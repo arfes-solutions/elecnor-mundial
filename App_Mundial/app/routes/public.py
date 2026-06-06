@@ -842,7 +842,7 @@ HTML_TEMPLATE = """
             }
 
             function matchupCard(m, path) {
-                return `<div class="col-6 col-md-3">
+                return `<div class="col-6">
                     <div class="mu-card mu-${path.toLowerCase()}">
                         ${teamSlotHTML(m.h)}
                         <div class="mu-vs">vs</div>
@@ -854,11 +854,16 @@ HTML_TEMPLATE = """
             function renderMatchups() {
                 const cont = document.getElementById('matchups-r32');
                 if (!cont) return;
+                const half = (matches, path, label) =>
+                    `<div class="col-12 col-md-6">
+                        <div class="mb-2"><span class="mu-path-header mu-path-${path.toLowerCase()}">${label}</span></div>
+                        <div class="row g-2">
+                            ${matches.map(m => matchupCard(m, path)).join('')}
+                        </div>
+                    </div>`;
                 cont.innerHTML =
-                    `<div class="col-12 mt-1"><span class="mu-path-header mu-path-l">⬅ Camino 1</span></div>` +
-                    MATCHUPS_R32.L.map(m => matchupCard(m,'L')).join('') +
-                    `<div class="col-12 mt-3"><span class="mu-path-header mu-path-r">Camino 2 ➡</span></div>` +
-                    MATCHUPS_R32.R.map(m => matchupCard(m,'R')).join('');
+                    half(MATCHUPS_R32.L, 'L', '⬅ Camino 1') +
+                    half(MATCHUPS_R32.R, 'R', 'Camino 2 ➡');
             }
 
             function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
