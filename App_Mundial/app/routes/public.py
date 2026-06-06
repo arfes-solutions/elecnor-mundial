@@ -110,16 +110,20 @@ HTML_TEMPLATE = """
             <!-- DESKTOP: grid 3 columnas -->
             <div class="nav-desktop">
                 <div class="d-flex gap-2">
+                    {% if authenticated %}
                     <a href="{{ url_for('public.welcome') }}" class="btn btn-light text-success fw-bold px-3">Inicio</a>
                     <button type="button" class="btn btn-light text-success fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalReglas">Reglas</button>
+                    {% endif %}
                 </div>
                 <div class="text-center">
                     <h1>PORRA MUNDIAL 2026</h1>
                     <p>Elecnor Sistemas</p>
                 </div>
                 <div class="d-flex align-items-center gap-2 justify-content-end">
+                    {% if authenticated %}
                     <a href="{{ url_for('public.ver_grupos') }}" class="btn btn-light text-success fw-bold px-3">Grupos</a>
                     <a href="{{ url_for('public.ver_horarios') }}" class="btn btn-light text-success fw-bold px-3">Horarios</a>
+                    {% endif %}
                 </div>
             </div>
 
@@ -129,11 +133,14 @@ HTML_TEMPLATE = """
                     <h1 style="font-size:1.1rem;margin:0;font-weight:700;">PORRA MUNDIAL 2026</h1>
                     <p style="font-size:.7rem;margin:0;opacity:.85;">Elecnor Sistemas</p>
                 </div>
+                {% if authenticated %}
                 <button class="btn btn-light text-success fw-bold px-2 py-1" type="button"
                         data-bs-toggle="collapse" data-bs-target="#mobileMenu" aria-expanded="false">
                     ☰
                 </button>
+                {% endif %}
             </div>
+            {% if authenticated %}
             <!-- MOBILE: menú desplegable -->
             <div class="collapse" id="mobileMenu">
                 <div class="d-flex flex-column gap-2 pt-2">
@@ -145,6 +152,7 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
             </div>
+            {% endif %}
 
         </div>
     </div>
@@ -1343,6 +1351,8 @@ def _render_ranking():
 
 @public_bp.route("/ranking")
 def ranking():
+    if not _authenticated():
+        return redirect(url_for("public.welcome"))
     return _render_ranking()
 
 
@@ -1362,6 +1372,8 @@ _KNOCKOUT_LABELS = {
 
 @public_bp.route("/grupos")
 def ver_grupos():
+    if not _authenticated():
+        return redirect(url_for("public.welcome"))
     try:
         storage  = get_storage()
         results  = storage.load_results()
@@ -1408,6 +1420,8 @@ def ver_grupos():
 
 @public_bp.route("/horarios")
 def ver_horarios():
+    if not _authenticated():
+        return redirect(url_for("public.welcome"))
     # Try dynamic fixtures from DB first
     fixtures = []
     try:
