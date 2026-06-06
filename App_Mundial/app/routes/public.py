@@ -789,8 +789,8 @@ HTML_TEMPLATE = """
                 background:#fff; border:1px solid #dee2e6; border-radius:7px;
                 overflow:hidden; margin-bottom:6px;
             }
-            .mu-slot-l { border-left:3px solid #198754; }
-            .mu-slot-r { border-left:3px solid #0d6efd; }
+            .mu-slot-l { border:2px solid #198754; }
+            .mu-slot-r { border:2px solid #0d6efd; }
             .mu-row {
                 display:flex; align-items:center; gap:8px;
                 padding:7px 10px; font-size:.82rem; font-weight:600;
