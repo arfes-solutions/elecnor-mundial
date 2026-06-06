@@ -730,12 +730,7 @@ HTML_TEMPLATE = """
                     <h5 class="bg-success text-white p-2 rounded text-center">1. Dieciseisavos de Final · ¿Quién pasa?</h5>
                     <p class="text-center text-muted small mb-3">Marca libremente los equipos que crees que avanzan. Puedes marcar los dos de un partido, uno solo, o ninguno.</p>
                     <div class="text-center mb-3"><span id="count-octavos" class="badge bg-warning text-dark fs-6">0 / 16 seleccionados</span></div>
-                    <div id="bracket-container" class="row g-3 mb-4"></div>
-                    <div class="mt-2 pt-3 border-top" id="pool-terceros">
-                        <h6 class="text-center fw-bold p-2 rounded" style="background:#343a40;color:#ffc107;">🔀 Pool de Mejores Terceros Clasificados</h6>
-                        <p class="text-center text-muted small">Estos equipos se asignarán a los huecos "Por determinar" según los grupos de los que procedan (se decide al final de la fase de grupos).</p>
-                        <div class="row g-2 justify-content-center" id="grid-terceros"></div>
-                    </div>
+                    <div class="row g-2" id="bracket-container"></div>
                 </div>
                 <div id="sec-cuartos" class="fase-section mb-5 border-top pt-4">
                     <h5 class="bg-success text-white p-2 rounded text-center">2. Selecciona 8 equipos para CUARTOS DE FINAL</h5>
@@ -768,241 +763,8 @@ HTML_TEMPLATE = """
                 </div>
             </form>
         </div>
-        <style>
-            /* ═══ BRACKET TREE ═══════════════════════════════════════════════ */
-            .bk-wrap {
-                display:flex; overflow-x:auto; align-items:stretch;
-                min-height:720px; padding-bottom:6px; gap:0;
-            }
-            .bk-half { display:flex; align-items:stretch; flex:1; min-width:0; }
-            .bk-half-l { flex-direction:row; }
-            .bk-half-r { flex-direction:row-reverse; }
-            .bk-final-wrap {
-                display:flex; align-items:center; justify-content:center;
-                flex-shrink:0; padding:0 4px;
-            }
-            .bk-col { display:flex; flex-direction:column; flex-shrink:0; }
-            .bk-col-r32 { width:148px; }
-            .bk-col-16  { width:62px; }
-            .bk-col-qf  { width:62px; }
-            .bk-col-sf  { width:62px; }
-            /* Groups: each group contains 2 child items.
-               The ::after pseudo-element draws the bracket arm connecting
-               the midpoints of both children to the next round. */
-            .bk-grp {
-                flex:1; display:flex; flex-direction:column;
-                position:relative; padding:3px 0; gap:3px;
-            }
-            /* ── Left pathway: arm on RIGHT ── */
-            .bk-half-l .bk-col-r32 .bk-grp,
-            .bk-half-l .bk-col-16  .bk-grp,
-            .bk-half-l .bk-col-qf  .bk-grp { padding-right:13px; }
-            .bk-half-l .bk-col-r32 .bk-grp::after,
-            .bk-half-l .bk-col-16  .bk-grp::after,
-            .bk-half-l .bk-col-qf  .bk-grp::after {
-                content:''; position:absolute;
-                right:0; top:25%; height:50%; width:13px;
-                border-top:2px solid #198754;
-                border-right:2px solid #198754;
-                border-bottom:2px solid #198754;
-                border-radius:0 5px 5px 0;
-            }
-            .bk-half-l .bk-col-sf .bk-grp { padding-right:10px; }
-            .bk-half-l .bk-col-sf .bk-grp::after {
-                content:''; position:absolute;
-                right:0; top:50%; height:0; width:10px;
-                border-top:2px solid #198754;
-                transform:translateY(-1px);
-            }
-            /* ── Right pathway: arm on LEFT ── */
-            .bk-half-r .bk-col-r32 .bk-grp,
-            .bk-half-r .bk-col-16  .bk-grp,
-            .bk-half-r .bk-col-qf  .bk-grp { padding-left:13px; }
-            .bk-half-r .bk-col-r32 .bk-grp::after,
-            .bk-half-r .bk-col-16  .bk-grp::after,
-            .bk-half-r .bk-col-qf  .bk-grp::after {
-                content:''; position:absolute;
-                left:0; top:25%; height:50%; width:13px;
-                border-top:2px solid #198754;
-                border-left:2px solid #198754;
-                border-bottom:2px solid #198754;
-                border-radius:5px 0 0 5px;
-            }
-            .bk-half-r .bk-col-sf .bk-grp { padding-left:10px; }
-            .bk-half-r .bk-col-sf .bk-grp::after {
-                content:''; position:absolute;
-                left:0; top:50%; height:0; width:10px;
-                border-top:2px solid #198754;
-                transform:translateY(-1px);
-            }
-            /* R32 match card (interactive) */
-            .bk-r32 {
-                flex:1; min-height:78px; background:#f8f9fa;
-                border:1px solid #dee2e6; border-radius:7px;
-                padding:5px; display:flex; flex-direction:column;
-            }
-            .bk-mid { font-size:.5rem; color:#bbb; text-align:center;
-                       margin-bottom:2px; letter-spacing:.02em; }
-            .bk-vs  { text-align:center; font-size:.55rem; color:#ccc;
-                       font-weight:700; margin:1px 0; }
-            .bk-tbd { background:white; border:1px dashed #dee2e6;
-                       border-radius:5px; padding:3px 4px; text-align:center;
-                       font-size:.6rem; color:#adb5bd; font-style:italic; line-height:1.3; }
-            .bk-r32 .team-label { font-size:.7rem; padding:4px 3px; }
-            /* Placeholder (R16, QF, SF) */
-            .bk-ph {
-                flex:1; min-height:28px; background:#e8f5e9;
-                border:1px solid #b2dfca; border-radius:6px; padding:4px 3px;
-                display:flex; flex-direction:column;
-                align-items:center; justify-content:center;
-                text-align:center; line-height:1.3;
-            }
-            .bk-ph span { font-size:.6rem; font-weight:700; color:#0f5132; }
-            .bk-ph small { font-size:.5rem; color:#6c757d; }
-            /* Final box */
-            .bk-final {
-                background:#fff3cd; border:2px solid #ffc107;
-                border-radius:10px; padding:10px 8px; text-align:center;
-                font-size:.72rem; font-weight:700; color:#333;
-                min-width:58px; line-height:1.5;
-            }
-            /* Round labels */
-            .bk-labels {
-                display:flex; font-size:.58rem; font-weight:700;
-                color:#198754; text-align:center; margin-bottom:4px;
-            }
-            .bk-lbl { flex-shrink:0; overflow:hidden; }
-            @media (max-width:767px){
-                .bk-col-r32{width:120px;} .bk-col-16,.bk-col-qf,.bk-col-sf{width:48px;}
-                .bk-r32 .team-label{font-size:.63rem;}
-            }
-        </style>
         <script>
             const savedGroups = {{ saved | tojson }};
-
-            function tn(p,g){ return g ? (savedGroups['g_'+g+'_'+p] || p+'º Gr.'+g) : null; }
-
-            function r32card(m) {
-                const hn = tn(m.h.p, m.h.g);
-                const isTBD = m.a.p === '3';
-                const an = isTBD ? null : tn(m.a.p, m.a.g);
-                const slot = (name, side) => {
-                    const uid = 'oct_'+m.id+'_'+side;
-                    return `<input type="checkbox" name="octavos" value="${name}" id="${uid}" class="team-checkbox chk-octavos"><label for="${uid}" class="team-label d-block text-truncate m-0">${name}</label>`;
-                };
-                return `<div class="bk-r32">
-                    <div class="bk-mid">${m.id} · ${m.h.p}º${m.h.g} vs ${isTBD?'3º?':m.a.p+'º'+m.a.g}</div>
-                    ${hn ? slot(hn,'h') : ''}
-                    <div class="bk-vs">vs</div>
-                    ${isTBD ? '<div class="bk-tbd">Por determinar<br><small>(mejor 3º)</small></div>' : (an ? slot(an,'a') : '')}
-                </div>`;
-            }
-
-            function ph(id, lbl) {
-                return `<div class="bk-ph"><span>${id}</span><small>${lbl}</small></div>`;
-            }
-
-            /* R32 column: 4 groups of 2 match cards each */
-            function r32col(pairs) {
-                return `<div class="bk-col bk-col-r32">${pairs.map(pair =>
-                    `<div class="bk-grp">${pair.map(m => r32card(m)).join('')}</div>`
-                ).join('')}</div>`;
-            }
-
-            /* R16 / QF columns: ids grouped in pairs of 2 */
-            function midcol(ids, lbl, colCls) {
-                let html = `<div class="bk-col ${colCls}">`;
-                for (let i = 0; i < ids.length; i += 2)
-                    html += `<div class="bk-grp">${ids.slice(i,i+2).map(id => ph(id,lbl)).join('')}</div>`;
-                return html + '</div>';
-            }
-
-            /* SF column: 1 group with 1 match (single tick to Final) */
-            function sfcol(id) {
-                return `<div class="bk-col bk-col-sf"><div class="bk-grp">${ph(id,'Semis')}</div></div>`;
-            }
-
-            /* ── Pathway data ─────────────────────────── */
-            const LP = [
-                [{id:'M74',h:{p:'1',g:'E'},a:{p:'3',g:null}}, {id:'M77',h:{p:'1',g:'I'},a:{p:'3',g:null}}],
-                [{id:'M73',h:{p:'2',g:'A'},a:{p:'2',g:'B'}},  {id:'M75',h:{p:'1',g:'F'},a:{p:'2',g:'C'}}],
-                [{id:'M83',h:{p:'2',g:'K'},a:{p:'2',g:'L'}},  {id:'M84',h:{p:'1',g:'H'},a:{p:'2',g:'J'}}],
-                [{id:'M81',h:{p:'1',g:'D'},a:{p:'3',g:null}}, {id:'M82',h:{p:'1',g:'G'},a:{p:'3',g:null}}],
-            ];
-            const RP = [
-                [{id:'M76',h:{p:'1',g:'C'},a:{p:'2',g:'F'}},  {id:'M78',h:{p:'2',g:'E'},a:{p:'2',g:'I'}}],
-                [{id:'M79',h:{p:'1',g:'A'},a:{p:'3',g:null}}, {id:'M80',h:{p:'1',g:'L'},a:{p:'3',g:null}}],
-                [{id:'M86',h:{p:'1',g:'J'},a:{p:'2',g:'H'}},  {id:'M88',h:{p:'2',g:'D'},a:{p:'2',g:'G'}}],
-                [{id:'M85',h:{p:'1',g:'B'},a:{p:'3',g:null}}, {id:'M87',h:{p:'1',g:'K'},a:{p:'3',g:null}}],
-            ];
-
-            function renderBracket() {
-                const W = { r32:'148px', m:'62px', fin:'66px' };
-                const labels = (side) => {
-                    const c = side==='l'
-                        ? ['Dieciseisavos','Octavos','Cuartos','Semis']
-                        : ['Semis','Cuartos','Octavos','Dieciseisavos'];
-                    const w = side==='l' ? [W.r32,W.m,W.m,W.m] : [W.m,W.m,W.m,W.r32];
-                    return c.map((t,i) => `<div class="bk-lbl" style="width:${w[i]};padding:0 2px">${t}</div>`).join('');
-                };
-
-                document.getElementById('bracket-container').innerHTML = `
-                <div class="bk-labels">
-                    ${labels('l')}
-                    <div class="bk-lbl" style="width:${W.fin};padding:0 4px">Final</div>
-                    ${labels('r')}
-                </div>
-                <div class="bk-wrap">
-                    <div class="bk-half bk-half-l">
-                        ${r32col(LP)}
-                        ${midcol(['M89','M90','M93','M94'],'Oct.','bk-col-16')}
-                        ${midcol(['M97','M98'],'Cuar.','bk-col-qf')}
-                        ${sfcol('M101')}
-                    </div>
-                    <div class="bk-final-wrap">
-                        <div class="bk-final">🏆<br>M104<br><small style="font-weight:400;font-size:.55rem">Final</small></div>
-                    </div>
-                    <div class="bk-half bk-half-r">
-                        ${sfcol('M102')}
-                        ${midcol(['M99','M100'],'Cuar.','bk-col-qf')}
-                        ${midcol(['M91','M92','M95','M96'],'Oct.','bk-col-16')}
-                        ${r32col(RP)}
-                    </div>
-                </div>`;
-
-                const terceros = [];
-                for (const g of 'ABCDEFGHIJKL') {
-                    const t = savedGroups['g_'+g+'_3'];
-                    if (t) terceros.push(t);
-                }
-                document.getElementById('grid-terceros').innerHTML = terceros.map((eq,i) =>
-                    `<div class="col-6 col-md-3 col-lg-2">
-                        <input type="checkbox" name="octavos" value="${eq}" id="oct_ter_${i}" class="team-checkbox chk-octavos">
-                        <label class="team-label text-truncate" for="oct_ter_${i}">${eq}</label>
-                    </div>`
-                ).join('');
-
-                document.querySelectorAll('.chk-octavos').forEach(chk => {
-                    chk.addEventListener('change', updateOctavos);
-                });
-            }
-
-            function updateOctavos() {
-                const all = document.querySelectorAll('.chk-octavos');
-                const selected = Array.from(all).filter(c => c.checked).map(c => c.value);
-                const counter = document.getElementById('count-octavos');
-                counter.innerText = selected.length + ' / 16 seleccionados';
-                if (selected.length >= 16) {
-                    counter.className = 'badge bg-success fs-6';
-                    all.forEach(c => { if (!c.checked) c.disabled = true; });
-                    generarSiguienteFase(selected, 'grid-cuartos', 'cua', 'cuartos', 'sec-cuartos');
-                } else {
-                    counter.className = 'badge bg-warning text-dark fs-6';
-                    all.forEach(c => c.disabled = false);
-                    document.getElementById('sec-cuartos').classList.remove('fase-active');
-                    limpiarFasesDesde('sec-cuartos');
-                }
-            }
 
             function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
                 const checkboxes = document.querySelectorAll('.' + origenClase);
@@ -1053,7 +815,20 @@ HTML_TEMPLATE = """
                 document.getElementById('btn-finalizar').classList.add('d-none');
             }
             document.addEventListener('DOMContentLoaded', function() {
-                renderBracket();
+                const grupos = 'ABCDEFGHIJKL'.split('');
+                const contenedor = document.getElementById('bracket-container');
+                grupos.forEach(g => {
+                    for (let p = 1; p <= 3; p++) {
+                        const equipo = savedGroups['g_'+g+'_'+p];
+                        if (equipo) {
+                            contenedor.innerHTML += `<div class="col-4 col-md-3 col-lg-2">
+                                <input type="checkbox" name="octavos" value="${equipo}" id="oct_${g}${p}" class="team-checkbox chk-octavos">
+                                <label class="team-label text-truncate" for="oct_${g}${p}">${equipo}</label>
+                            </div>`;
+                        }
+                    }
+                });
+                setupFase('chk-octavos', 'grid-cuartos', 'cua', 16, 'count-octavos', 'sec-cuartos', 'cuartos');
                 document.getElementById('sec-octavos').scrollIntoView({behavior: 'smooth', block: 'start'});
             });
         </script>
