@@ -727,15 +727,14 @@ HTML_TEMPLATE = """
             <p class="text-center text-muted">Selecciona los equipos que avanzan en cada ronda.</p>
             <form method="POST" action="{{ url_for('public.eliminatorias_fase') }}" id="form-eliminatorias">
                 <div id="sec-octavos" class="fase-section fase-active mb-5">
-                    <h5 class="bg-success text-white p-2 rounded text-center">1. Selecciona 16 equipos para OCTAVOS DE FINAL</h5>
+                    <h5 class="bg-success text-white p-2 rounded text-center">1. Dieciseisavos de Final · ¿Quién pasa?</h5>
+                    <p class="text-center text-muted small mb-3">Marca libremente los equipos que crees que avanzan. Puedes marcar los dos de un partido, uno solo, o ninguno.</p>
                     <div class="text-center mb-3"><span id="count-octavos" class="badge bg-warning text-dark fs-6">0 / 16 seleccionados</span></div>
-                    <div class="row g-2">
-                        {% for equipo in clasificados %}
-                        <div class="col-4 col-md-3 col-lg-2">
-                            <input type="checkbox" name="octavos" value="{{ equipo }}" id="oct_{{ loop.index }}" class="team-checkbox chk-octavos">
-                            <label class="team-label text-truncate" for="oct_{{ loop.index }}">{{ equipo }}</label>
-                        </div>
-                        {% endfor %}
+                    <div id="bracket-container" class="row g-3 mb-4"></div>
+                    <div class="mt-2 pt-3 border-top" id="pool-terceros">
+                        <h6 class="text-center fw-bold p-2 rounded" style="background:#343a40;color:#ffc107;">🔀 Pool de Mejores Terceros Clasificados</h6>
+                        <p class="text-center text-muted small">Estos equipos se asignarán a los huecos "Por determinar" según los grupos de los que procedan (se decide al final de la fase de grupos).</p>
+                        <div class="row g-2 justify-content-center" id="grid-terceros"></div>
                     </div>
                 </div>
                 <div id="sec-cuartos" class="fase-section mb-5 border-top pt-4">
@@ -769,7 +768,118 @@ HTML_TEMPLATE = """
                 </div>
             </form>
         </div>
+        <style>
+            .match-card { border-radius:10px; background:#f8f9fa; border:1px solid #dee2e6; padding:8px; }
+            .match-id { font-size:.6rem; color:#adb5bd; text-align:center; margin-bottom:4px; letter-spacing:.05em; }
+            .match-vs { text-align:center; font-size:.65rem; color:#6c757d; font-weight:700; margin:2px 0; }
+            .tbd-slot { background:white; border:1px dashed #adb5bd; border-radius:8px; padding:6px 4px; text-align:center; font-size:.72rem; color:#adb5bd; font-style:italic; }
+            .team-label { font-size:.78rem; padding:6px 4px; }
+        </style>
         <script>
+            const savedGroups = {{ saved | tojson }};
+
+            const BRACKET = [
+                {sec:'Camino 1 · Superior', matches:[
+                    {id:'M73',home:{p:'2',g:'A'},away:{p:'2',g:'B'}},
+                    {id:'M74',home:{p:'1',g:'E'},away:{p:'3',g:null}},
+                    {id:'M75',home:{p:'1',g:'F'},away:{p:'2',g:'C'}},
+                    {id:'M77',home:{p:'1',g:'I'},away:{p:'3',g:null}},
+                ]},
+                {sec:'Camino 1 · Inferior', matches:[
+                    {id:'M83',home:{p:'2',g:'K'},away:{p:'2',g:'L'}},
+                    {id:'M84',home:{p:'1',g:'H'},away:{p:'2',g:'J'}},
+                    {id:'M81',home:{p:'1',g:'D'},away:{p:'3',g:null}},
+                    {id:'M82',home:{p:'1',g:'G'},away:{p:'3',g:null}},
+                ]},
+                {sec:'Camino 2 · Superior', matches:[
+                    {id:'M76',home:{p:'1',g:'C'},away:{p:'2',g:'F'}},
+                    {id:'M78',home:{p:'2',g:'E'},away:{p:'2',g:'I'}},
+                    {id:'M79',home:{p:'1',g:'A'},away:{p:'3',g:null}},
+                    {id:'M80',home:{p:'1',g:'L'},away:{p:'3',g:null}},
+                ]},
+                {sec:'Camino 2 · Inferior', matches:[
+                    {id:'M86',home:{p:'1',g:'J'},away:{p:'2',g:'H'}},
+                    {id:'M88',home:{p:'2',g:'D'},away:{p:'2',g:'G'}},
+                    {id:'M85',home:{p:'1',g:'B'},away:{p:'3',g:null}},
+                    {id:'M87',home:{p:'1',g:'K'},away:{p:'3',g:null}},
+                ]},
+            ];
+
+            function teamName(p, g) {
+                if (!g) return null;
+                return savedGroups['g_' + g + '_' + p] || (p + 'º Grupo ' + g);
+            }
+
+            function teamSlot(name, matchId, side) {
+                const uid = 'oct_' + matchId + '_' + side;
+                return `<input type="checkbox" name="octavos" value="${name}" id="${uid}" class="team-checkbox chk-octavos">
+                        <label for="${uid}" class="team-label d-block text-truncate m-0">${name}</label>`;
+            }
+
+            function renderBracket() {
+                const container = document.getElementById('bracket-container');
+                const terGrid = document.getElementById('grid-terceros');
+                let html = '';
+
+                BRACKET.forEach(section => {
+                    html += `<div class="col-md-6 col-lg-3">
+                        <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-success text-white fw-bold text-center py-2" style="font-size:.8rem;">${section.sec}</div>
+                        <div class="card-body p-2 d-flex flex-column gap-2">`;
+
+                    section.matches.forEach(m => {
+                        const hn = teamName(m.home.p, m.home.g);
+                        const an = teamName(m.away.p, m.away.g);
+                        const isTBD = m.away.p === '3';
+                        html += `<div class="match-card">
+                            <div class="match-id">${m.id} · ${m.home.p}º ${m.home.g} vs ${isTBD ? '3º ?' : m.away.p + 'º ' + m.away.g}</div>
+                            ${hn ? teamSlot(hn, m.id, 'h') : ''}
+                            <div class="match-vs">vs</div>
+                            ${isTBD ? '<div class="tbd-slot">Por determinar<br>(mejor 3º)</div>' : (an ? teamSlot(an, m.id, 'a') : '')}
+                        </div>`;
+                    });
+
+                    html += `</div></div></div>`;
+                });
+
+                container.innerHTML = html;
+
+                // Render thirds pool
+                const terceros = [];
+                for (const g of 'ABCDEFGHIJKL') {
+                    const t = savedGroups['g_' + g + '_3'];
+                    if (t) terceros.push(t);
+                }
+                terGrid.innerHTML = terceros.map((eq, i) =>
+                    `<div class="col-6 col-md-3 col-lg-2">
+                        <input type="checkbox" name="octavos" value="${eq}" id="oct_ter_${i}" class="team-checkbox chk-octavos">
+                        <label class="team-label text-truncate" for="oct_ter_${i}">${eq}</label>
+                    </div>`
+                ).join('');
+
+                // Attach events
+                document.querySelectorAll('.chk-octavos').forEach(chk => {
+                    chk.addEventListener('change', updateOctavos);
+                });
+            }
+
+            function updateOctavos() {
+                const all = document.querySelectorAll('.chk-octavos');
+                const selected = Array.from(all).filter(c => c.checked).map(c => c.value);
+                const counter = document.getElementById('count-octavos');
+                counter.innerText = selected.length + ' / 16 seleccionados';
+                if (selected.length >= 16) {
+                    counter.className = 'badge bg-success fs-6';
+                    all.forEach(c => { if (!c.checked) c.disabled = true; });
+                    generarSiguienteFase(selected, 'grid-cuartos', 'cua', 'cuartos', 'sec-cuartos');
+                } else {
+                    counter.className = 'badge bg-warning text-dark fs-6';
+                    all.forEach(c => c.disabled = false);
+                    document.getElementById('sec-cuartos').classList.remove('fase-active');
+                    limpiarFasesDesde('sec-cuartos');
+                }
+            }
+
             function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
                 const checkboxes = document.querySelectorAll('.' + origenClase);
                 checkboxes.forEach(chk => {
@@ -818,9 +928,8 @@ HTML_TEMPLATE = """
                 });
                 document.getElementById('btn-finalizar').classList.add('d-none');
             }
-            setupFase('chk-octavos', 'grid-cuartos', 'cua', 16, 'count-octavos', 'sec-cuartos', 'cuartos');
-            // Scroll suavemente a la sección de eliminatorias
             document.addEventListener('DOMContentLoaded', function() {
+                renderBracket();
                 document.getElementById('sec-octavos').scrollIntoView({behavior: 'smooth', block: 'start'});
             });
         </script>
