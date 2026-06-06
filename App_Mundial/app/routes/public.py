@@ -778,17 +778,27 @@ HTML_TEMPLATE = """
             </form>
         </div>
         <style>
-            .mu-card { background:#fff; border:1px solid #dee2e6; border-radius:10px; padding:10px 12px; text-align:center; height:100%; }
-            .mu-card.mu-l { border-left:3px solid #198754; }
-            .mu-card.mu-r { border-left:3px solid #0d6efd; }
-            .mu-team { display:flex; align-items:center; gap:6px; justify-content:center; padding:4px 0; font-weight:600; font-size:.88rem; }
-            .mu-flag { width:22px; height:16px; border-radius:2px; object-fit:cover; flex-shrink:0; }
-            .mu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; }
-            .mu-vs { font-size:.72rem; color:#adb5bd; font-weight:700; letter-spacing:.05em; padding:1px 0; }
-            .mu-tbd { font-style:italic; color:#adb5bd; font-size:.78rem; padding:4px 0; }
-            .mu-path-header { font-size:.8rem; font-weight:700; padding:4px 10px; border-radius:6px; display:inline-block; margin-bottom:6px; }
-            .mu-path-l { background:#d1e7dd; color:#0f5132; }
-            .mu-path-r { background:#cfe2ff; color:#084298; }
+            /* FIFA-style bracket slots */
+            .mu-half-title {
+                font-size:.78rem; font-weight:700; padding:5px 12px;
+                border-radius:20px; display:inline-block; margin-bottom:8px; letter-spacing:.03em;
+            }
+            .mu-half-title-l { background:#d1e7dd; color:#0f5132; }
+            .mu-half-title-r { background:#cfe2ff; color:#084298; }
+            .mu-slot {
+                background:#fff; border:1px solid #dee2e6; border-radius:7px;
+                overflow:hidden; margin-bottom:6px;
+            }
+            .mu-slot-l { border-left:3px solid #198754; }
+            .mu-slot-r { border-left:3px solid #0d6efd; }
+            .mu-row {
+                display:flex; align-items:center; gap:8px;
+                padding:7px 10px; font-size:.82rem; font-weight:600;
+            }
+            .mu-row + .mu-row { border-top:1px solid #f2f2f2; }
+            .mu-flag { width:22px; height:15px; border-radius:2px; object-fit:cover; flex-shrink:0; }
+            .mu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .mu-tbd { color:#bbb; font-style:italic; font-weight:400; font-size:.76rem; }
         </style>
         <script>
             const savedGroups = {{ saved | tojson }};
@@ -832,38 +842,32 @@ HTML_TEMPLATE = """
                 ],
             };
 
-            function teamSlotHTML(slot) {
-                if (!slot.g) return `<div class="mu-tbd">Tercero por determinar</div>`;
+            function teamRow(slot) {
+                if (!slot.g) return `<div class="mu-row"><span class="mu-tbd">Tercero por determinar</span></div>`;
                 const name = savedGroups['g_'+slot.g+'_'+slot.p];
-                if (!name) return `<div class="mu-tbd">${slot.p}º Grupo ${slot.g}</div>`;
+                if (!name) return `<div class="mu-row"><span class="mu-tbd">${slot.p}º Grupo ${slot.g}</span></div>`;
                 const code = FLAG_MAP[name] || '';
                 const flag = code ? `<img class="mu-flag" src="https://flagcdn.com/20x15/${code}.png" alt="">` : '';
-                return `<div class="mu-team">${flag}<span class="mu-name">${name}</span></div>`;
+                return `<div class="mu-row">${flag}<span class="mu-name">${name}</span></div>`;
             }
 
-            function matchupCard(m, path) {
-                return `<div class="col-6">
-                    <div class="mu-card mu-${path.toLowerCase()}">
-                        ${teamSlotHTML(m.h)}
-                        <div class="mu-vs">vs</div>
-                        ${teamSlotHTML(m.a)}
-                    </div>
+            function matchSlot(m, path) {
+                return `<div class="mu-slot mu-slot-${path.toLowerCase()}">
+                    ${teamRow(m.h)}${teamRow(m.a)}
                 </div>`;
             }
 
             function renderMatchups() {
                 const cont = document.getElementById('matchups-r32');
                 if (!cont) return;
-                const half = (matches, path, label) =>
+                const half = (matches, path, label, titleCls) =>
                     `<div class="col-12 col-md-6">
-                        <div class="mb-2"><span class="mu-path-header mu-path-${path.toLowerCase()}">${label}</span></div>
-                        <div class="row g-2">
-                            ${matches.map(m => matchupCard(m, path)).join('')}
-                        </div>
+                        <div class="mb-2"><span class="mu-half-title ${titleCls}">${label}</span></div>
+                        ${matches.map(m => matchSlot(m, path)).join('')}
                     </div>`;
                 cont.innerHTML =
-                    half(MATCHUPS_R32.L, 'L', '⬅ Camino 1') +
-                    half(MATCHUPS_R32.R, 'R', 'Camino 2 ➡');
+                    half(MATCHUPS_R32.L, 'L', '⬅ Camino 1', 'mu-half-title-l') +
+                    half(MATCHUPS_R32.R, 'R', 'Camino 2 ➡', 'mu-half-title-r');
             }
 
             function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
