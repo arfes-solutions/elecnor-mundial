@@ -961,7 +961,6 @@ HTML_TEMPLATE = """
         {# ── FASE ELIMINATORIA ── #}
         <div class="card p-4 mx-auto shadow-sm" style="max-width:1200px;">
             <h3 class="fw-bold text-success border-bottom pb-3 text-center">Fase Eliminatoria - {{ nombre }}</h3>
-            <p class="text-center text-muted">Selecciona los equipos que avanzan en cada ronda.</p>
             <form method="POST" action="{{ url_for('public.eliminatorias_fase') }}" id="form-eliminatorias">
                 <div id="sec-octavos" class="fase-section fase-active mb-5">
                     <div class="mb-4">
