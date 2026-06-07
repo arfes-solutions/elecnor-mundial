@@ -967,7 +967,10 @@ HTML_TEMPLATE = """
                         <h6 class="text-center fw-bold text-success mb-1">🏟️ Emparejamientos de Dieciseisavos</h6>
                         <div class="mx-auto mb-3" style="max-width:100%; background:#f0faf4; border-left:4px solid #198754; border-radius:6px; padding:12px 16px; display:flex; align-items:flex-start; gap:10px;">
                             <span style="font-size:1.1rem; margin-top:1px;">ℹ️</span>
-                            <p class="mb-0" style="color:#1a5c38; font-size:.88rem; font-weight:500; line-height:1.5;">Así es como quedarían los cruces de acuerdo a tus predicciones en la fase de grupos.<br><strong>El cuadro real se conocerá cuando finalice la fase de grupos.</strong></p>
+                            <div style="color:#1a5c38; font-size:.88rem; font-weight:500; line-height:1.5;">
+                                <div>Así es como quedarían los cruces de acuerdo a tus predicciones en la fase de grupos.</div>
+                                <div><strong>El cuadro real se conocerá cuando finalice la fase de grupos.</strong></div>
+                            </div>
                         </div>
                         <div class="row g-2" id="matchups-r32"></div>
                     </div>
