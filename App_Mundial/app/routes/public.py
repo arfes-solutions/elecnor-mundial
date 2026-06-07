@@ -965,7 +965,10 @@ HTML_TEMPLATE = """
                 <div id="sec-octavos" class="fase-section fase-active mb-5">
                     <div class="mb-4">
                         <h6 class="text-center fw-bold text-success mb-1">🏟️ Emparejamientos de Dieciseisavos</h6>
-                        <p class="text-center text-muted small mb-3">Así quedan los cruces iniciales basados en tus predicciones de la Fase de Grupos.</p>
+                        <div class="mx-auto mb-3" style="max-width:700px; background:#f0faf4; border-left:4px solid #198754; border-radius:6px; padding:12px 16px; display:flex; align-items:flex-start; gap:10px;">
+                            <span style="font-size:1.1rem; margin-top:1px;">ℹ️</span>
+                            <p class="mb-0" style="color:#1a5c38; font-size:.88rem; font-weight:500; line-height:1.5;">Así es como quedarían los cruces de acuerdo a tus predicciones en la fase de grupos. <strong>El cuadro real se conocerá cuando finalice la fase de grupos.</strong></p>
+                        </div>
                         <div class="row g-2" id="matchups-r32"></div>
                     </div>
                     <hr>
