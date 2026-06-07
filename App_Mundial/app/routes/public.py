@@ -39,6 +39,7 @@ HTML_TEMPLATE = """
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Poppins', sans-serif; background-color: #f2f9f5; color: #2c3e50; padding-top: 110px; }
+        body.login-page { background-color: #000; padding-top: 0; overflow: hidden; }
         .header-banner {
             position: fixed; top: 0; left: 0; right: 0; z-index: 1050;
             background: linear-gradient(135deg, #0f5132 0%, #198754 100%);
@@ -101,9 +102,150 @@ HTML_TEMPLATE = """
             body { padding-top: 150px; }
             .btn { padding: .35rem .6rem; font-size: .78rem; }
         }
+
+        /* ══════════════════════════════════════
+           LOGIN PAGE — estilos exclusivos
+        ══════════════════════════════════════ */
+        .login-page .header-banner {
+            position: relative !important;
+            border-radius: 0 0 18px 18px;
+            background: rgba(0,0,0,.60) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,.7) !important;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+        }
+        /* Capas de fondo */
+        .lp-bg-img {
+            position: fixed; inset: 0; z-index: 0;
+            background: url('/static/login_bg.png') center center / cover no-repeat;
+        }
+        .lp-bg-overlay {
+            position: fixed; inset: 0; z-index: 1;
+            background: rgba(0,0,0,.38);
+        }
+        .lp-crowd-canvas, .lp-spot-canvas {
+            position: fixed; inset: 0; pointer-events: none;
+        }
+        .lp-crowd-canvas { z-index: 2; }
+        .lp-spot-canvas  { z-index: 3; }
+        .lp-confetti-piece {
+            position: fixed; top: -24px; z-index: 4; pointer-events: none;
+        }
+        /* Contenedor login centrado */
+        .lp-center {
+            position: relative; z-index: 40;
+            display: flex; align-items: center; justify-content: center;
+            min-height: calc(100vh - 68px);
+            padding: 24px 16px;
+        }
+        /* Texto derecho */
+        .lp-right-deco {
+            position: fixed; right: 4%; bottom: 10%;
+            text-align: right; pointer-events: none; user-select: none;
+            z-index: 40;
+            animation: lpDecoIn .9s cubic-bezier(.22,1,.36,1) .3s both;
+        }
+        @keyframes lpDecoIn { from { opacity:0; transform: translateX(30px); } to { opacity:1; transform:none; } }
+        .lp-right-deco .lp-trophy {
+            font-size: 3.5rem; display: block; text-align: right;
+            filter: drop-shadow(0 0 18px rgba(255,200,50,.7));
+            animation: lpTrophy 2.8s ease-in-out infinite;
+        }
+        @keyframes lpTrophy {
+            0%,100% { filter: drop-shadow(0 0 18px rgba(255,200,50,.5)); transform: scale(1) translateY(0); }
+            50%      { filter: drop-shadow(0 0 34px rgba(255,220,80,1));  transform: scale(1.07) translateY(-4px); }
+        }
+        .lp-right-deco .lp-slogan {
+            font-size: 2.4rem; font-weight: 900; color: #fff;
+            text-transform: uppercase; line-height: 1.05; letter-spacing: 1px;
+            text-shadow: 3px 3px 0 rgba(0,0,0,.9), 0 0 30px rgba(255,200,50,.3);
+        }
+        .lp-right-deco .lp-slogan span {
+            display: block; color: #f0c040;
+            text-shadow: 3px 3px 0 rgba(0,0,0,.9), 0 0 20px rgba(255,200,50,.7);
+        }
+        /* Card glassmorphism */
+        .lp-card {
+            background: rgba(10,30,15,.55);
+            backdrop-filter: blur(22px) saturate(1.4);
+            -webkit-backdrop-filter: blur(22px) saturate(1.4);
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,.13);
+            box-shadow: 0 32px 80px rgba(0,0,0,.7),
+                        0 0 0 1px rgba(255,255,255,.06) inset,
+                        0 1px 0 rgba(255,255,255,.15) inset;
+            padding: 44px 48px 40px;
+            width: 100%; max-width: 420px;
+            position: relative; overflow: hidden;
+            animation: lpCardIn .8s cubic-bezier(.22,1,.36,1) both;
+        }
+        @keyframes lpCardIn { from { opacity:0; transform:translateY(40px) scale(.95); } to { opacity:1; transform:none; } }
+        @keyframes lpShimmer { 0% { transform:translateX(-100%); } 100% { transform:translateX(200%); } }
+        .lp-card::before {
+            content:''; position:absolute; top:0; left:0; right:0; height:2px;
+            background: linear-gradient(90deg,transparent 0%,rgba(46,204,113,.0) 10%,rgba(46,204,113,.9) 40%,rgba(240,192,64,1) 50%,rgba(46,204,113,.9) 60%,rgba(46,204,113,.0) 90%,transparent 100%);
+            animation: lpShimmer 3s ease-in-out infinite;
+        }
+        .lp-card::after {
+            content:''; position:absolute; bottom:-60px; left:50%; transform:translateX(-50%);
+            width:260px; height:120px;
+            background: radial-gradient(ellipse, rgba(46,204,113,.18) 0%, transparent 70%);
+            pointer-events:none;
+        }
+        .lp-card-header { text-align:center; margin-bottom:28px; }
+        .lp-badge {
+            display:inline-flex; align-items:center; gap:8px;
+            background: linear-gradient(135deg,rgba(26,92,56,.8),rgba(46,160,80,.6));
+            border:1px solid rgba(46,204,113,.3); border-radius:50px;
+            padding:6px 18px 6px 10px; margin-bottom:14px;
+        }
+        .lp-badge-icon {
+            width:28px; height:28px;
+            background: linear-gradient(135deg,#1a5c38,#2ecc71);
+            border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1rem;
+        }
+        .lp-badge span { color:rgba(255,255,255,.9); font-size:.78rem; font-weight:700; letter-spacing:.5px; }
+        .lp-card h2 { color:#fff; font-size:1.55rem; font-weight:800; letter-spacing:.5px; text-shadow:0 2px 12px rgba(0,0,0,.5); margin-bottom:4px; }
+        .lp-card .lp-sub { color:rgba(255,255,255,.5); font-size:.82rem; }
+        .lp-divider { height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent); margin:20px 0 24px; }
+        .lp-input-group { margin-bottom:18px; }
+        .lp-input-group label { color:rgba(255,255,255,.75); font-weight:600; font-size:.82rem; display:block; margin-bottom:7px; letter-spacing:.3px; }
+        .lp-input-wrap { position:relative; }
+        .lp-input-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:1rem; opacity:.5; pointer-events:none; }
+        .lp-input-wrap input {
+            width:100%; padding:13px 14px 13px 40px;
+            background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+            border-radius:12px; color:#fff; font-size:.97rem; outline:none;
+            transition:border-color .2s,background .2s,box-shadow .2s;
+            backdrop-filter:blur(4px); font-family:'Poppins',sans-serif;
+        }
+        .lp-input-wrap input::placeholder { color:rgba(255,255,255,.25); }
+        .lp-input-wrap input:focus { border-color:rgba(46,204,113,.6); background:rgba(255,255,255,.13); box-shadow:0 0 0 3px rgba(46,204,113,.12); }
+        .lp-btn {
+            width:100%; padding:15px;
+            background:linear-gradient(135deg,#1a7a40 0%,#2ecc71 50%,#1a7a40 100%);
+            background-size:200% auto; color:#fff; border:none; border-radius:12px;
+            font-size:1rem; font-weight:800; cursor:pointer; letter-spacing:1px;
+            text-transform:uppercase; font-family:'Poppins',sans-serif;
+            box-shadow:0 6px 24px rgba(46,204,113,.35),0 0 0 1px rgba(255,255,255,.1) inset;
+            transition:background-position .4s,transform .15s,box-shadow .2s;
+            position:relative; overflow:hidden;
+        }
+        .lp-btn:hover { background-position:right center; transform:translateY(-2px); box-shadow:0 10px 32px rgba(46,204,113,.5),0 0 0 1px rgba(255,255,255,.15) inset; }
+        .lp-btn:active { transform:translateY(0); }
+        .lp-btn::after { content:''; position:absolute; top:0; left:-80%; width:60%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent); transform:skewX(-20deg); transition:left .5s; }
+        .lp-btn:hover::after { left:130%; }
+        .lp-card-footer { text-align:center; margin-top:20px; }
+        .lp-card-footer p { color:rgba(255,255,255,.25); font-size:.7rem; letter-spacing:.3px; }
+        .lp-alert-error { background:rgba(220,53,69,.2); border:1px solid rgba(220,53,69,.4); color:#f8d7da; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:.85rem; text-align:center; }
+        @media (max-width:576px) {
+            .lp-card { padding:36px 24px 32px; }
+            .lp-right-deco { display:none; }
+        }
     </style>
 </head>
-<body>
+<body {% if vista == 'login_register' %}class="login-page"{% endif %}>
     <div class="header-banner">
         <div class="mx-auto" style="max-width:1400px;">
 
@@ -271,31 +413,122 @@ HTML_TEMPLATE = """
         </script>
 
         {% elif vista == 'login_register' %}
-        <div class="row justify-content-center mt-2">
-            <div class="col-md-5 col-lg-4">
-                <div class="card p-4">
-                    <h4 class="fw-bold text-success border-bottom pb-3 mb-1 text-center">⚽ Porra Mundial 2026</h4>
-                    <p class="text-center text-muted small mb-4">Acceso exclusivo para empleados de Elecnor Sistemas.</p>
-                    {% if auth_error %}
-                    <div class="alert alert-danger py-2">{{ auth_error }}</div>
-                    {% endif %}
-                    <form method="POST" action="{{ url_for('public.login') }}">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-success fs-5">Usuario</label>
-                            <input type="text" name="username" class="form-control form-control-lg border-success text-center"
-                                   required autocomplete="username">
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label fw-bold text-success fs-5">Contraseña</label>
-                            <input type="password" name="password"
-                                   class="form-control form-control-lg border-success text-center"
-                                   required autocomplete="current-password">
-                        </div>
-                        <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Entrar →</button>
-                    </form>
-                </div>
-            </div>
+        <!-- Capas de fondo -->
+        <div class="lp-bg-img"></div>
+        <div class="lp-bg-overlay"></div>
+        <canvas class="lp-crowd-canvas" id="lpCrowd"></canvas>
+        <canvas class="lp-spot-canvas"  id="lpSpot"></canvas>
+        <div id="lpConfetti"></div>
+
+        <!-- Deco derecha -->
+        <div class="lp-right-deco">
+            <span class="lp-trophy">🏆</span>
+            <div class="lp-slogan">Rumbo a la<span>Gloria</span></div>
         </div>
+
+        <!-- Card glassmorphism -->
+        <div class="lp-center">
+          <div class="lp-card">
+            <div class="lp-card-header">
+              <div class="lp-badge">
+                <div class="lp-badge-icon">⚽</div>
+                <span>ELECNOR SISTEMAS</span>
+              </div>
+              <h2>Porra Mundial 2026</h2>
+              <p class="lp-sub">Acceso exclusivo para empleados</p>
+            </div>
+            {% if auth_error %}
+            <div class="lp-alert-error">⚠️ {{ auth_error }}</div>
+            {% endif %}
+            <div class="lp-divider"></div>
+            <form method="POST" action="{{ url_for('public.login') }}">
+              <div class="lp-input-group">
+                <label>Usuario</label>
+                <div class="lp-input-wrap">
+                  <span class="lp-input-icon">👤</span>
+                  <input type="text" name="username" autocomplete="username" placeholder="Tu nombre de usuario" required>
+                </div>
+              </div>
+              <div class="lp-input-group">
+                <label>Contraseña</label>
+                <div class="lp-input-wrap">
+                  <span class="lp-input-icon">🔒</span>
+                  <input type="password" name="password" autocomplete="current-password" placeholder="••••••••" required>
+                </div>
+              </div>
+              <button type="submit" class="lp-btn">⚡ Entrar al torneo</button>
+            </form>
+            <div class="lp-card-footer">
+              <p>🏆 USA · México · Canadá 2026</p>
+            </div>
+          </div>
+        </div>
+
+        <script>
+        /* ── GRADAS ── */
+        (function(){
+          const cv=document.getElementById('lpCrowd'), ctx=cv.getContext('2d');
+          let W,H; function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;} resize(); addEventListener('resize',resize);
+          const DOTS=280; let dots=[];
+          function init(){dots=[];for(let i=0;i<DOTS;i++){dots.push({x:Math.random()*W,y:Math.random()*H*.52,r:1+Math.random()*2.2,hue:Math.floor(Math.random()*360),sat:40+Math.random()*60,alpha:.1+Math.random()*.3,phase:Math.random()*Math.PI*2,speed:.02+Math.random()*.05,waveAmp:2+Math.random()*4,waveFreq:.5+Math.random()*1.5});}} init(); addEventListener('resize',init);
+          let f=0;
+          function draw(){ctx.clearRect(0,0,W,H);f++;dots.forEach(d=>{const wx=Math.sin(f*.012*d.waveFreq+d.x*.01)*d.waveAmp,pulse=Math.abs(Math.sin(f*d.speed+d.phase)),a=d.alpha*(.5+pulse*.5);ctx.beginPath();ctx.arc(d.x+wx,d.y,d.r,0,Math.PI*2);ctx.fillStyle=`hsla(${d.hue},${d.sat}%,70%,${a})`;ctx.fill();});requestAnimationFrame(draw);}
+          draw();
+        })();
+
+        /* ── FOCOS ── */
+        (function(){
+          const cv=document.getElementById('lpSpot'), ctx=cv.getContext('2d');
+          let W,H; function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;} resize(); addEventListener('resize',resize);
+          const spots=[
+            {ox:.04,oy:.02,baseAng:.55,   angAmp:.30,angSpd:.007,phase:0,   intBase:.14,intAmp:.08,intSpd:.019},
+            {ox:.96,oy:.02,baseAng:Math.PI-.55,angAmp:.30,angSpd:.008,phase:2.1,intBase:.14,intAmp:.07,intSpd:.022},
+            {ox:.08,oy:.0, baseAng:.65,   angAmp:.20,angSpd:.011,phase:4.2,intBase:.10,intAmp:.06,intSpd:.015},
+            {ox:.92,oy:.0, baseAng:Math.PI-.65,angAmp:.20,angSpd:.009,phase:1.3,intBase:.10,intAmp:.06,intSpd:.017},
+          ];
+          let t=0;
+          function draw(){
+            ctx.clearRect(0,0,W,H);
+            spots.forEach(sp=>{
+              const ox=sp.ox*W,oy=sp.oy*H,ang=sp.baseAng+Math.sin(t*sp.angSpd+sp.phase)*sp.angAmp;
+              const len=Math.max(W,H)*1.1,tx=ox+Math.cos(ang)*len,ty=oy+Math.sin(ang)*len;
+              const intensity=sp.intBase+Math.sin(t*sp.intSpd+sp.phase*1.3)*sp.intAmp;
+              const spread=.065,ra=Math.atan2(ty-oy,tx-ox),dist=Math.hypot(tx-ox,ty-oy);
+              const g=ctx.createRadialGradient(ox,oy,0,ox,oy,dist);
+              g.addColorStop(0,`rgba(255,245,200,${intensity})`);
+              g.addColorStop(.3,`rgba(255,245,200,${intensity*.5})`);
+              g.addColorStop(1,`rgba(255,245,200,0)`);
+              ctx.save();ctx.beginPath();ctx.moveTo(ox,oy);ctx.arc(ox,oy,dist,ra-spread,ra+spread);ctx.closePath();
+              ctx.fillStyle=g;ctx.globalCompositeOperation='lighter';ctx.fill();ctx.restore();
+              ctx.save();ctx.beginPath();ctx.arc(ox,oy,4,0,Math.PI*2);
+              ctx.fillStyle=`rgba(255,245,200,${.7+intensity*2})`;ctx.shadowColor='rgba(255,240,180,1)';ctx.shadowBlur=14;ctx.fill();ctx.restore();
+            });
+            t++;requestAnimationFrame(draw);
+          }
+          draw();
+        })();
+
+        /* ── CONFETI ── */
+        (function(){
+          const wrap=document.getElementById('lpConfetti');
+          const COLORS=['#f0c040','#2ecc71','#ffffff','#e74c3c','#3498db','#f39c12','#1abc9c','#e91e63','#9c27b0'];
+          for(let i=0;i<60;i++){
+            const el=document.createElement('div');
+            el.className='lp-confetti-piece';
+            const color=COLORS[Math.floor(Math.random()*COLORS.length)];
+            const isCircle=Math.random()>.55,w=isCircle?5+Math.random()*6:4+Math.random()*7,h=isCircle?w:9+Math.random()*13;
+            const left=Math.random()*100,dur=5+Math.random()*9,delay=-(Math.random()*dur),drift=(Math.random()-.5)*120;
+            el.style.cssText=`left:${left}vw;width:${w}px;height:${h}px;background:${color};border-radius:${isCircle?'50%':'2px'};opacity:${.7+Math.random()*.3};box-shadow:0 0 4px ${color}88;`;
+            el.animate([
+              {transform:`translateY(-24px) translateX(0px) rotate(0deg) scaleX(1)`,opacity:0},
+              {transform:`translateY(5vh) translateX(${drift*.1}px) rotate(60deg)`,opacity:1,offset:.06},
+              {transform:`translateY(50vh) translateX(${drift*.6}px) rotate(300deg) scaleX(-1)`,opacity:.95,offset:.5},
+              {transform:`translateY(108vh) translateX(${drift}px) rotate(740deg) scaleX(1)`,opacity:0}
+            ],{duration:dur*1000,delay:delay*1000,iterations:Infinity,easing:'linear'});
+            wrap.appendChild(el);
+          }
+        })();
+        </script>
 
         {% elif vista == 'nuevo_nombre' %}
         <div class="row justify-content-center">
