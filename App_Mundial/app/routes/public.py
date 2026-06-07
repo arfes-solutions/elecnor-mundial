@@ -52,6 +52,9 @@ HTML_TEMPLATE = """
         .table-custom-header { background-color: #0f5132 !important; color: white !important; }
         .puntos-oro { color: #d4af37; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
         .btn-success-custom { background-color: #198754; border: none; border-radius: 8px; transition: all 0.3s ease; }
+        /* Oculta el ojo nativo del navegador en el campo de contraseña */
+        #pwd-input::-ms-reveal, #pwd-input::-ms-clear { display:none; }
+        #pwd-input::-webkit-credentials-auto-fill-button { display:none !important; }
         .btn-success-custom:hover:not(:disabled) { background-color: #146c43; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(25,135,84,0.3); }
         .btn-success-custom:disabled { opacity: 0.5; cursor: not-allowed; background-color: #6c757d; }
         .btn-outline-custom { color: #0f5132; border-color: #0f5132; border-radius: 8px; }
@@ -290,10 +293,21 @@ HTML_TEMPLATE = """
                             <div class="position-relative">
                                 <input type="password" name="password" id="pwd-input"
                                        class="form-control form-control-lg border-success text-center pe-5"
-                                       required autocomplete="current-password">
+                                       required autocomplete="current-password"
+                                       style="-ms-reveal:none;-webkit-text-security:disc;">
                                 <button type="button" id="pwd-toggle"
-                                        style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6c757d;padding:0;line-height:1;"
-                                        onclick="var i=document.getElementById('pwd-input');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁️':'🙈';">👁️</button>
+                                        onclick="var i=document.getElementById('pwd-input'),s=document.getElementById('pwd-eye'),h=document.getElementById('pwd-eye-off');i.type=i.type==='password'?'text':'password';s.style.display=i.type==='password'?'block':'none';h.style.display=i.type==='text'?'block':'none';"
+                                        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6c757d;padding:4px;line-height:0;">
+                                    <svg id="pwd-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                                    </svg>
+                                    <svg id="pwd-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" style="display:none;">
+                                        <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/>
+                                        <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
+                                        <path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Entrar →</button>
