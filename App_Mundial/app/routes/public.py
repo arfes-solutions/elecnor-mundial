@@ -123,7 +123,7 @@ HTML_TEMPLATE = """
         }
         .lp-bg-overlay {
             position: fixed; inset: 0; z-index: 1;
-            background: rgba(0,0,0,.38);
+            background: rgba(0,0,0,.18);
         }
         .lp-crowd-canvas, .lp-spot-canvas {
             position: fixed; inset: 0; pointer-events: none;
