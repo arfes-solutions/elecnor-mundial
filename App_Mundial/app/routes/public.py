@@ -964,13 +964,13 @@ HTML_TEMPLATE = """
             <p class="text-center text-muted">Selecciona los equipos que avanzan en cada ronda.</p>
             <form method="POST" action="{{ url_for('public.eliminatorias_fase') }}" id="form-eliminatorias">
                 <div id="sec-octavos" class="fase-section fase-active mb-5">
-                    <h5 class="bg-success text-white p-2 rounded text-center">1. Selecciona 16 equipos para OCTAVOS DE FINAL</h5>
                     <div class="mb-4">
                         <h6 class="text-center fw-bold text-success mb-1">🏟️ Emparejamientos de Dieciseisavos</h6>
                         <p class="text-center text-muted small mb-3">Así quedan los cruces iniciales basados en tus predicciones de la Fase de Grupos.</p>
                         <div class="row g-2" id="matchups-r32"></div>
                     </div>
                     <hr>
+                    <h5 class="bg-success text-white p-2 rounded text-center mb-3">1. Selecciona 16 equipos para OCTAVOS DE FINAL</h5>
                     <p class="text-center text-muted small mb-2">Ahora marca libremente los equipos que crees que pasan. Puedes marcar los dos de un partido, uno solo, o ninguno.</p>
                     <div class="text-center mb-3"><span id="count-octavos" class="badge bg-warning text-dark fs-6">0 / 16 seleccionados</span></div>
                     <div class="row g-2" id="bracket-container"></div>
