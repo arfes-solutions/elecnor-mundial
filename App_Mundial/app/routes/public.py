@@ -1016,7 +1016,7 @@ HTML_TEMPLATE = """
             /* Columns */
             .bkt-col { display:flex; flex-direction:column; flex-shrink:0; }
             .bkt-col-r32 { width:188px; }
-            .bkt-col-mid { width:150px; }
+            .bkt-col-mid { width:100px; }
 
             /* Groups — 2 children, bracket arm on the side */
             .bkt-grp { flex:1; display:flex; flex-direction:column; position:relative; gap:4px; padding:4px 0; }
@@ -1063,7 +1063,7 @@ HTML_TEMPLATE = """
             .bkt-mtbd { color:#ccc; font-style:italic; font-weight:400; font-size:.68rem; }
 
             /* Placeholder slots (R16, QF, SF) */
-            .bkt-ph { flex:1; min-height:24px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:.58rem; color:#adb5bd; }
+            .bkt-ph { flex:1; min-height:56px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:.58rem; color:#adb5bd; }
 
             /* Thirds pool */
             .bkt-thirds { text-align:center; margin-top:14px; padding-top:12px; border-top:1px dashed #dee2e6; }
