@@ -1,4 +1,5 @@
-from flask import Blueprint, redirect, render_template_string, request, session, url_for
+import os
+from flask import Blueprint, redirect, render_template_string, request, session, url_for, send_file, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.data.tournament import GROUPS, TEAMS
@@ -118,7 +119,7 @@ HTML_TEMPLATE = """
         /* Capas de fondo */
         .lp-bg-img {
             position: fixed; inset: 0; z-index: 0;
-            background: url('/static/login_bg.png') center center / cover no-repeat;
+            background: url('/login-bg.png') center center / cover no-repeat;
         }
         .lp-bg-overlay {
             position: fixed; inset: 0; z-index: 1;
@@ -1553,6 +1554,16 @@ def _generar_calendario():
 # ---------------------------------------------------------------------------
 # ROUTES
 # ---------------------------------------------------------------------------
+@public_bp.route("/login-bg.png")
+def login_bg():
+    """Serve the login background image."""
+    img_path = os.path.join(os.path.dirname(__file__), "..", "static", "login_bg.png")
+    img_path = os.path.abspath(img_path)
+    if os.path.exists(img_path):
+        return send_file(img_path, mimetype="image/png")
+    return Response("", status=404)
+
+
 @public_bp.route("/")
 def welcome():
     if not _logged_in():
