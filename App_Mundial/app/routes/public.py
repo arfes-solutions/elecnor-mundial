@@ -421,12 +421,6 @@ HTML_TEMPLATE = """
         <canvas class="lp-spot-canvas"  id="lpSpot"></canvas>
         <div id="lpConfetti"></div>
 
-        <!-- Deco derecha -->
-        <div class="lp-right-deco">
-            <span class="lp-trophy">🏆</span>
-            <div class="lp-slogan">Rumbo a la<span>Gloria</span></div>
-        </div>
-
         <!-- Card glassmorphism -->
         <div class="lp-center">
           <div class="lp-card">
