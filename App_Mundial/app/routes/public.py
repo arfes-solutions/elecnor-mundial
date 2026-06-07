@@ -287,8 +287,14 @@ HTML_TEMPLATE = """
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold text-success fs-5">Contraseña</label>
-                            <input type="text" name="password" class="form-control form-control-lg border-success text-center"
-                                   required autocomplete="off">
+                            <div class="position-relative">
+                                <input type="password" name="password" id="pwd-input"
+                                       class="form-control form-control-lg border-success text-center pe-5"
+                                       required autocomplete="current-password">
+                                <button type="button" id="pwd-toggle"
+                                        style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6c757d;padding:0;line-height:1;"
+                                        onclick="var i=document.getElementById('pwd-input');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁️':'🙈';">👁️</button>
+                            </div>
                         </div>
                         <button type="submit" class="btn btn-success-custom text-white fw-bold w-100 py-2 fs-5">Entrar →</button>
                     </form>
