@@ -1016,7 +1016,7 @@ HTML_TEMPLATE = """
 
             /* Columns */
             .bkt-col { display:flex; flex-direction:column; flex-shrink:0; }
-            .bkt-col-r32 { width:150px; }
+            .bkt-col-r32 { width:188px; }
             .bkt-col-mid { width:56px; }
 
             /* Groups — 2 children, bracket arm on the side */
