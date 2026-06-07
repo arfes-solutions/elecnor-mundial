@@ -52,16 +52,6 @@ HTML_TEMPLATE = """
         .header-banner p { font-size: clamp(0.65rem, 1.2vw, 0.9rem); font-weight: 400; margin: 0; opacity: 0.9; }
         .card { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: none; background-color: rgba(255,255,255,0.98); }
         .table-custom-header { background-color: #0f5132 !important; color: white !important; }
-        .rank-badge { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; font-size:.85rem; font-weight:800; color:#fff; }
-        .rank-1 { background: linear-gradient(135deg,#f6d365,#e8a800); box-shadow:0 3px 10px rgba(232,168,0,.45); }
-        .rank-2 { background: linear-gradient(135deg,#d0d0d0,#a0a0a0); box-shadow:0 3px 10px rgba(150,150,150,.4); }
-        .rank-3 { background: linear-gradient(135deg,#e8a87c,#c0733a); box-shadow:0 3px 10px rgba(180,100,50,.35); }
-        .rank-other { background:#e9ecef; color:#495057; }
-        .ranking-row-1 { background:linear-gradient(90deg,rgba(246,211,101,.08),transparent) !important; }
-        .ranking-row-2 { background:linear-gradient(90deg,rgba(208,208,208,.08),transparent) !important; }
-        .ranking-row-3 { background:linear-gradient(90deg,rgba(232,168,124,.08),transparent) !important; }
-        .ranking-row-even { background:#fafafa !important; }
-        .table-hover tbody tr:hover { background:rgba(25,135,84,.06) !important; transition:background .15s; }
         .puntos-oro { color: #d4af37; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
         .btn-success-custom { background-color: #198754; border: none; border-radius: 8px; transition: all 0.3s ease; }
         .btn-success-custom:hover:not(:disabled) { background-color: #146c43; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(25,135,84,0.3); }
@@ -341,32 +331,27 @@ HTML_TEMPLATE = """
                     <table class="table table-hover align-middle">
                         <thead class="table-custom-header">
                             <tr>
-                                <th scope="col" class="py-3 ps-4 rounded-start-2">Pos</th>
+                                <th scope="col" class="py-3 rounded-start-2">Pos</th>
                                 <th scope="col" class="py-3">Nombre</th>
                                 <th scope="col" class="text-center py-3">Puntos</th>
-                                <th scope="col" class="text-end py-3 pe-4 rounded-end-2">Predicciones</th>
+                                <th scope="col" class="text-end py-3 rounded-end-2">Predicciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for jug in clasificacion %}
-                            <tr class="{% if loop.index == 1 %}ranking-row-1{% elif loop.index == 2 %}ranking-row-2{% elif loop.index == 3 %}ranking-row-3{% elif loop.index is even %}ranking-row-even{% endif %}">
-                                <td class="ps-4 py-3">
-                                    {% if loop.index == 1 %}
-                                    <span class="rank-badge rank-1">1</span>
-                                    {% elif loop.index == 2 %}
-                                    <span class="rank-badge rank-2">2</span>
-                                    {% elif loop.index == 3 %}
-                                    <span class="rank-badge rank-3">3</span>
-                                    {% else %}
-                                    <span class="rank-badge rank-other">{{ loop.index }}</span>
-                                    {% endif %}
+                            <tr>
+                                <td class="fw-bold fs-5">
+                                    {% if loop.index == 1 %}🥇
+                                    {% elif loop.index == 2 %}🥈
+                                    {% elif loop.index == 3 %}🥉
+                                    {% else %}{{ loop.index }}º{% endif %}
                                 </td>
                                 <td class="fw-bold fs-5">{{ jug.name }}</td>
                                 <td class="text-center fw-bold fs-4 puntos-oro" data-pts="{{ jug.points }}" data-name="{{ jug.name }}">
                                     {{ jug.points }} pts
                                     <span class="pts-delta d-none fw-bold text-success small"></span>
                                 </td>
-                                <td class="text-end pe-4">
+                                <td class="text-end">
                                     <a href="{{ url_for('public.ver_prediccion', participant_id=jug.id) }}" class="btn btn-sm btn-outline-custom px-3">Ver predicción</a>
                                 </td>
                             </tr>
