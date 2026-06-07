@@ -110,10 +110,10 @@ HTML_TEMPLATE = """
         .login-page .header-banner {
             position: relative !important;
             border-radius: 0 0 18px 18px;
-            background: rgba(0,0,0,.60) !important;
+            background: rgba(10,46,25,.65) !important;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            box-shadow: 0 2px 20px rgba(0,0,0,.7) !important;
+            box-shadow: 0 2px 20px rgba(0,0,0,.5) !important;
             border-bottom: 1px solid rgba(255,255,255,.1);
         }
         /* Capas de fondo */
