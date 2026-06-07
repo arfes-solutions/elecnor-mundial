@@ -779,10 +779,10 @@ HTML_TEMPLATE = """
         </div>
         <style>
             /* ── Bracket tree ───────────────────────────────────────────────── */
-            .bkt-wrap { display:flex; overflow-x:auto; align-items:stretch; min-height:600px; padding:4px 0 8px; }
-            .bkt-half { display:flex; align-items:stretch; flex:1; min-width:0; }
+            .bkt-wrap { display:flex; overflow-x:auto; justify-content:center; align-items:stretch; min-height:600px; padding:4px 0 8px; }
+            .bkt-half { display:flex; align-items:stretch; flex:0 0 auto; }
             .bkt-half-l { flex-direction:row; }
-            .bkt-half-r { flex-direction:row-reverse; }
+            .bkt-half-r { flex-direction:row; }
             .bkt-center { display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:0 6px; font-size:2.8rem; }
 
             /* Columns */
