@@ -1064,6 +1064,7 @@ HTML_TEMPLATE = """
 
             /* Placeholder slots (R16, QF, SF) */
             .bkt-ph { flex:none; height:60px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:.58rem; color:#adb5bd; }
+            .bkt-col-mid .bkt-grp { justify-content:center; gap:8px; }
 
             /* Thirds pool */
             .bkt-thirds { text-align:center; margin-top:14px; padding-top:12px; border-top:1px dashed #dee2e6; }
