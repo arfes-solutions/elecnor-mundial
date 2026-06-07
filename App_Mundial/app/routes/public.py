@@ -191,7 +191,7 @@ HTML_TEMPLATE = """
                                 <th scope="col" class="py-3 rounded-start-2">Pos</th>
                                 <th scope="col" class="py-3">Nombre</th>
                                 <th scope="col" class="text-center py-3">Puntos</th>
-                                <th scope="col" class="text-end py-3 rounded-end-2">Predicción</th>
+                                <th scope="col" class="text-end py-3 rounded-end-2">Predicciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -778,27 +778,72 @@ HTML_TEMPLATE = """
             </form>
         </div>
         <style>
-            /* FIFA-style bracket slots */
-            .mu-half-title {
-                font-size:.78rem; font-weight:700; padding:5px 12px;
-                border-radius:20px; display:inline-block; margin-bottom:8px; letter-spacing:.03em;
+            /* ── Bracket tree ───────────────────────────────────────────────── */
+            .bkt-wrap { display:flex; overflow-x:auto; align-items:stretch; min-height:600px; padding:4px 0 8px; }
+            .bkt-half { display:flex; align-items:stretch; flex:1; min-width:0; }
+            .bkt-half-l { flex-direction:row; }
+            .bkt-half-r { flex-direction:row-reverse; }
+            .bkt-center { display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:0 6px; font-size:2.8rem; }
+
+            /* Columns */
+            .bkt-col { display:flex; flex-direction:column; flex-shrink:0; }
+            .bkt-col-r32 { width:150px; }
+            .bkt-col-mid { width:56px; }
+
+            /* Groups — 2 children, bracket arm on the side */
+            .bkt-grp { flex:1; display:flex; flex-direction:column; position:relative; gap:4px; padding:4px 0; }
+
+            /* Left pathway: arm on RIGHT */
+            .bkt-half-l .bkt-col-r32 .bkt-grp,
+            .bkt-half-l .bkt-col-mid .bkt-grp { padding-right:14px; }
+            .bkt-half-l .bkt-col-r32 .bkt-grp::after,
+            .bkt-half-l .bkt-col-mid .bkt-grp::after {
+                content:''; position:absolute; right:0; top:25%; height:50%; width:14px;
+                border-top:2px solid #adb5bd; border-right:2px solid #adb5bd; border-bottom:2px solid #adb5bd;
+                border-radius:0 4px 4px 0;
             }
-            .mu-half-title-l { background:#d1e7dd; color:#0f5132; }
-            .mu-half-title-r { background:#cfe2ff; color:#084298; }
-            .mu-slot {
-                background:#fff; border:1px solid #dee2e6; border-radius:7px;
-                overflow:hidden; margin-bottom:6px;
+            /* SF → Final tick */
+            .bkt-half-l .bkt-col-sf .bkt-grp { padding-right:8px; }
+            .bkt-half-l .bkt-col-sf .bkt-grp::after {
+                content:''; position:absolute; right:0; top:50%; width:8px; height:0;
+                border-top:2px solid #adb5bd; transform:translateY(-1px);
             }
-            .mu-slot-l { border:2px solid #198754; }
-            .mu-slot-r { border:2px solid #0d6efd; }
-            .mu-row {
-                display:flex; align-items:center; gap:8px;
-                padding:7px 10px; font-size:.82rem; font-weight:600;
+
+            /* Right pathway: arm on LEFT */
+            .bkt-half-r .bkt-col-r32 .bkt-grp,
+            .bkt-half-r .bkt-col-mid .bkt-grp { padding-left:14px; }
+            .bkt-half-r .bkt-col-r32 .bkt-grp::after,
+            .bkt-half-r .bkt-col-mid .bkt-grp::after {
+                content:''; position:absolute; left:0; top:25%; height:50%; width:14px;
+                border-top:2px solid #adb5bd; border-left:2px solid #adb5bd; border-bottom:2px solid #adb5bd;
+                border-radius:4px 0 0 4px;
             }
-            .mu-row + .mu-row { border-top:1px solid #f2f2f2; }
-            .mu-flag { width:22px; height:15px; border-radius:2px; object-fit:cover; flex-shrink:0; }
-            .mu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-            .mu-tbd { color:#bbb; font-style:italic; font-weight:400; font-size:.76rem; }
+            .bkt-half-r .bkt-col-sf .bkt-grp { padding-left:8px; }
+            .bkt-half-r .bkt-col-sf .bkt-grp::after {
+                content:''; position:absolute; left:0; top:50%; width:8px; height:0;
+                border-top:2px solid #adb5bd; transform:translateY(-1px);
+            }
+
+            /* R32 match slot */
+            .bkt-mslot { flex:1; min-height:56px; background:#fff; border:1px solid #dee2e6; border-radius:6px; overflow:hidden; }
+            .bkt-mslot-l { border:2px solid #198754; }
+            .bkt-mslot-r { border:2px solid #0d6efd; }
+            .bkt-mrow { display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:.75rem; font-weight:600; }
+            .bkt-mrow + .bkt-mrow { border-top:1px solid #f0f0f0; }
+            .bkt-mflag { width:18px; height:13px; border-radius:2px; object-fit:cover; flex-shrink:0; }
+            .bkt-mname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .bkt-mtbd { color:#ccc; font-style:italic; font-weight:400; font-size:.68rem; }
+
+            /* Placeholder slots (R16, QF, SF) */
+            .bkt-ph { flex:1; min-height:24px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:.58rem; color:#adb5bd; }
+
+            /* Thirds pool */
+            .bkt-thirds { text-align:center; margin-top:14px; padding-top:12px; border-top:1px dashed #dee2e6; }
+            .bkt-third-pill {
+                display:inline-flex; align-items:center; gap:5px;
+                background:#fd7e14; color:#fff; border-radius:20px;
+                padding:4px 10px; font-size:.72rem; font-weight:600; margin:3px;
+            }
         </style>
         <script>
             const savedGroups = {{ saved | tojson }};
@@ -842,32 +887,69 @@ HTML_TEMPLATE = """
                 ],
             };
 
-            function teamRow(slot) {
-                if (!slot.g) return `<div class="mu-row"><span class="mu-tbd">Tercero por determinar</span></div>`;
+            function mrow(slot) {
+                if (!slot.g) return `<div class="bkt-mrow"><span class="bkt-mtbd">Tercero por determinar</span></div>`;
                 const name = savedGroups['g_'+slot.g+'_'+slot.p];
-                if (!name) return `<div class="mu-row"><span class="mu-tbd">${slot.p}º Grupo ${slot.g}</span></div>`;
+                if (!name) return `<div class="bkt-mrow"><span class="bkt-mtbd">${slot.p}º Grupo ${slot.g}</span></div>`;
                 const code = FLAG_MAP[name] || '';
-                const flag = code ? `<img class="mu-flag" src="https://flagcdn.com/20x15/${code}.png" alt="">` : '';
-                return `<div class="mu-row">${flag}<span class="mu-name">${name}</span></div>`;
+                const flag = code ? `<img class="bkt-mflag" src="https://flagcdn.com/20x15/${code}.png" alt="">` : '';
+                return `<div class="bkt-mrow">${flag}<span class="bkt-mname">${name}</span></div>`;
             }
 
-            function matchSlot(m, path) {
-                return `<div class="mu-slot mu-slot-${path.toLowerCase()}">
-                    ${teamRow(m.h)}${teamRow(m.a)}
-                </div>`;
+            function mslot(m, path) {
+                return `<div class="bkt-mslot bkt-mslot-${path.toLowerCase()}">${mrow(m.h)}${mrow(m.a)}</div>`;
+            }
+
+            function ph() { return `<div class="bkt-ph"></div>`; }
+
+            function r32col(matches, path) {
+                let html = `<div class="bkt-col bkt-col-r32">`;
+                for (let i = 0; i < matches.length; i += 2)
+                    html += `<div class="bkt-grp">${mslot(matches[i],path)}${mslot(matches[i+1],path)}</div>`;
+                return html + '</div>';
+            }
+
+            function midcol(n, extraCls) {
+                let html = `<div class="bkt-col bkt-col-mid ${extraCls||''}">`;
+                for (let i = 0; i < n; i += 2)
+                    html += `<div class="bkt-grp">${ph()}${ph()}</div>`;
+                return html + '</div>';
+            }
+
+            function sfcol() {
+                return `<div class="bkt-col bkt-col-mid bkt-col-sf"><div class="bkt-grp">${ph()}</div></div>`;
             }
 
             function renderMatchups() {
                 const cont = document.getElementById('matchups-r32');
                 if (!cont) return;
-                const half = (matches, path, label, titleCls) =>
-                    `<div class="col-12 col-md-6">
-                        <div class="mb-2"><span class="mu-half-title ${titleCls}">${label}</span></div>
-                        ${matches.map(m => matchSlot(m, path)).join('')}
-                    </div>`;
-                cont.innerHTML =
-                    half(MATCHUPS_R32.L, 'L', '⬅ Camino 1', 'mu-half-title-l') +
-                    half(MATCHUPS_R32.R, 'R', 'Camino 2 ➡', 'mu-half-title-r');
+
+                // Thirds pool — teams the user picked 3rd in each group
+                const thirds = 'ABCDEFGHIJKL'.split('').map(g => {
+                    const name = savedGroups['g_'+g+'_3'];
+                    if (!name) return null;
+                    const code = FLAG_MAP[name] || '';
+                    const flag = code ? `<img class="bkt-mflag" src="https://flagcdn.com/20x15/${code}.png" alt="">` : '';
+                    return `<span class="bkt-third-pill">${flag}${name}</span>`;
+                }).filter(Boolean);
+
+                cont.innerHTML = `
+                <div class="bkt-wrap">
+                    <div class="bkt-half bkt-half-l">
+                        ${r32col(MATCHUPS_R32.L,'L')}
+                        ${midcol(4)}
+                        ${midcol(2)}
+                        ${sfcol()}
+                    </div>
+                    <div class="bkt-center">🏆</div>
+                    <div class="bkt-half bkt-half-r">
+                        ${sfcol()}
+                        ${midcol(2)}
+                        ${midcol(4)}
+                        ${r32col(MATCHUPS_R32.R,'R')}
+                    </div>
+                </div>
+                ${thirds.length ? `<div class="bkt-thirds"><strong>Terceros posibles:</strong><div class="mt-2">${thirds.join('')}</div></div>` : ''}`;
             }
 
             function setupFase(origenClase, destinoGrid, destinoPrefijo, maxSelect, counterId, nextSectionId, nameAttr) {
