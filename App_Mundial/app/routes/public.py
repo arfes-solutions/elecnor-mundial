@@ -1069,9 +1069,11 @@ HTML_TEMPLATE = """
             /* Thirds pool */
             .bkt-thirds { text-align:center; margin-top:14px; padding-top:12px; border-top:1px dashed #dee2e6; }
             .bkt-third-pill {
-                display:inline-flex; align-items:center; gap:5px;
-                background:#fd7e14; color:#fff; border-radius:20px;
-                padding:4px 10px; font-size:.72rem; font-weight:600; margin:3px;
+                display:inline-flex; align-items:center; gap:6px;
+                background:#fff; color:#d4601a; border:2px solid #fd7e14;
+                border-radius:20px; padding:7px 14px;
+                font-size:.82rem; font-weight:700; margin:4px;
+                box-shadow: 0 1px 4px rgba(253,126,20,.15);
             }
         </style>
         <script>
