@@ -1128,7 +1128,7 @@ HTML_TEMPLATE = """
                 const name = savedGroups['g_'+slot.g+'_'+slot.p];
                 if (!name) return `<div class="bkt-mrow"><span class="bkt-mtbd">${slot.p}º Grupo ${slot.g}</span></div>`;
                 const code = FLAG_MAP[name] || '';
-                const flag = code ? `<img class="bkt-mflag" src="https://flagcdn.com/20x15/${code}.png" alt="">` : '';
+                const flag = code ? `<img class="bkt-mflag" src="https://flagcdn.com/w20/${code}.png" alt="">` : '';
                 return `<div class="bkt-mrow">${flag}<span class="bkt-mname">${name}</span></div>`;
             }
 
@@ -1165,7 +1165,7 @@ HTML_TEMPLATE = """
                     const name = savedGroups['g_'+g+'_3'];
                     if (!name) return null;
                     const code = FLAG_MAP[name] || '';
-                    const flag = code ? `<img class="bkt-mflag" src="https://flagcdn.com/20x15/${code}.png" alt="">` : '';
+                    const flag = code ? `<img class="bkt-mflag" src="https://flagcdn.com/w20/${code}.png" alt="">` : '';
                     return `<span class="bkt-third-pill">${flag}${name}</span>`;
                 }).filter(Boolean);
 
