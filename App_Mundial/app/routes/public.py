@@ -1902,9 +1902,9 @@ def eliminatorias_fase():
         }
         try:
             storage = get_storage()
-            p = storage.get_prediction_by_name(nombre)
-            pred = p.get("prediction", {}) if p else {"grupos": {}}
-            pred["eliminatorias"] = elim
+            # Los grupos vienen de la sesión (no se guardan antes)
+            grupos_data = session.get("pred_grupos", {})
+            pred = {"grupos": grupos_data, "eliminatorias": elim}
             storage.save_prediction_by_name(nombre, pred)
             session.pop("pred_nombre", None)
             session.pop("pred_grupos", None)
