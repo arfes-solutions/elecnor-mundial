@@ -43,12 +43,11 @@ _NAME_MAP = {
     "Iran": "Irán",
     "New Zealand": "Nueva Zelanda",
     "Spain": "España",
-    "Cape Verde": "Cabo Verde", "Cape Verde Islands": "Cabo Verde",
+    "Cape Verde Islands": "Cape Verde",
     "Saudi Arabia": "Arabia Saudita",
     "Uruguay": "Uruguay",
     "France": "Francia",
     "Senegal": "Senegal",
-    "Iraq": "Irak",
     "Norway": "Noruega",
     "Argentina": "Argentina",
     "Algeria": "Argelia",
@@ -73,8 +72,8 @@ _FLAG_MAP = {
     "Alemania": "de", "Curazao": "cw", "Costa de Marfil": "ci", "Ecuador": "ec",
     "Países Bajos": "nl", "Japón": "jp", "Suecia": "se", "Túnez": "tn",
     "Bélgica": "be", "Egipto": "eg", "Irán": "ir", "Nueva Zelanda": "nz",
-    "España": "es", "Cabo Verde": "cv", "Arabia Saudita": "sa", "Uruguay": "uy",
-    "Francia": "fr", "Senegal": "sn", "Irak": "iq", "Noruega": "no",
+    "España": "es", "Cape Verde": "cv", "Arabia Saudita": "sa", "Uruguay": "uy",
+    "Francia": "fr", "Senegal": "sn", "Iraq": "iq", "Noruega": "no",
     "Argentina": "ar", "Argelia": "dz", "Austria": "at", "Jordania": "jo",
     "Portugal": "pt", "RD Congo": "cd", "Uzbekistán": "uz", "Colombia": "co",
     "Inglaterra": "gb-eng", "Croacia": "hr", "Ghana": "gh", "Panamá": "pa",
@@ -152,6 +151,11 @@ def fetch_all(api_key: str) -> dict:
 
         advanced = {"octavos": set(), "cuartos": set(), "semis": set(), "final": set()}
         champion = runner_up = None
+        # Track completion per group and per knockout round
+        group_total    = {}   # letter -> total match count
+        group_finished = {}   # letter -> finished match count
+        round_total    = {}   # round_key -> total
+        round_finished = {}   # round_key -> finished
 
         for m in matches:
             stage      = m.get("stage", "")
@@ -167,12 +171,35 @@ def fetch_all(api_key: str) -> dict:
             away_score = ft.get("away")
             winner_key = score.get("winner")           # HOME_TEAM / AWAY_TEAM / DRAW
 
+            # If the bulk endpoint returned null for a finished match, fetch it individually
+            if status in _STATUS_FINISHED and (home_score is None or away_score is None):
+                try:
+                    match_id = m.get("id")
+                    if match_id:
+                        r2 = _req.get(f"{_BASE}/matches/{match_id}", headers=_headers(api_key), timeout=10)
+                        if r2.status_code == 200:
+                            ft2 = (r2.json().get("score") or {}).get("fullTime") or {}
+                            if ft2.get("home") is not None:
+                                home_score = ft2["home"]
+                                away_score = ft2.get("away")
+                                winner_key = (r2.json().get("score") or {}).get("winner", winner_key)
+                except Exception:
+                    pass
+
             fecha, hora = _utc_to_peninsular(utc_date)
             label, round_key = _STAGE_LABELS.get(stage, (stage, None))
             group_letter = group_raw.replace("GROUP_", "") if group_raw.startswith("GROUP_") else ""
 
             is_finished = status in _STATUS_FINISHED
             is_live     = status in _STATUS_LIVE
+
+            # Track completion counters
+            if stage == "GROUP_STAGE" and group_letter:
+                group_total[group_letter]    = group_total.get(group_letter, 0) + 1
+                group_finished[group_letter] = group_finished.get(group_letter, 0) + (1 if is_finished else 0)
+            elif round_key and stage != "FINAL":
+                round_total[round_key]    = round_total.get(round_key, 0) + 1
+                round_finished[round_key] = round_finished.get(round_key, 0) + (1 if is_finished else 0)
 
             # Build fixture entry
             fixture = {
@@ -213,6 +240,17 @@ def fetch_all(api_key: str) -> dict:
         if runner_up:
             results["subcampeon"] = runner_up
 
+        # Store completion flags
+        for letter, total in group_total.items():
+            if total > 0 and group_finished.get(letter, 0) >= total:
+                results[f"g_{letter.lower()}_complete"] = True
+        for ronda, total in round_total.items():
+            if total > 0 and round_finished.get(ronda, 0) >= total:
+                results[f"{ronda}_complete"] = True
+        # Final is its own round
+        if champion:
+            results["final_complete"] = True
+
     except Exception as exc:
         raise RuntimeError(f"Error fetching matches: {exc}")
 
@@ -226,14 +264,14 @@ def fetch_all(api_key: str) -> dict:
         for standing in r.json().get("standings", []):
             if standing.get("type") != "TOTAL":
                 continue
-            letter = standing.get("group", "").replace("GROUP_", "")
+            raw_group = standing.get("group", "")
+            letter = raw_group.replace("GROUP_", "").replace("Group ", "").strip()
             if not letter or len(letter) != 1:
                 continue
-            for row in standing.get("table", []):
-                pos  = row.get("position")
+            for idx, row in enumerate(standing.get("table", []), start=1):
                 name = _norm(row.get("team", {}).get("name", ""))
-                if pos in (1, 2, 3) and name:
-                    results[f"g_{letter.lower()}_{pos}"] = name
+                if name and idx <= 3:
+                    results[f"g_{letter.lower()}_{idx}"] = name
     except Exception:
         pass   # standings failure is non-fatal
 
