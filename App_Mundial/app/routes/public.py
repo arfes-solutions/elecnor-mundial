@@ -325,7 +325,6 @@ HTML_TEMPLATE = """
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
                     <h3 class="card-title m-0 fw-bold text-success">Clasificación General</h3>
-                    <a href="{{ url_for('public.nueva_prediccion') }}" class="btn btn-success-custom text-white fw-bold px-4 py-2">➕ Añadir predicción</a>
                 </div>
                 {% if not puntos_activos %}
                 <div class="alert d-flex align-items-center gap-2 mb-4" style="background:rgba(255,193,7,0.15);border:1px solid rgba(255,193,7,0.4);border-radius:10px;color:#856404;">
