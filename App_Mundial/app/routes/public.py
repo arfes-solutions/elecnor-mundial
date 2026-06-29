@@ -2062,6 +2062,21 @@ def admin_panel():
             except Exception as exc:
                 msg, ok = f"Error al guardar partido: {exc}", False
 
+        elif action == "fix_pichichi" and authed:
+            try:
+                pid = request.form.get("participant_id", "").strip()
+                new_value = request.form.get("new_pichichi", "").strip()
+                p = get_storage().get_participant_by_id(pid)
+                if not p:
+                    msg, ok = f"No se encontró el participante con id '{pid}'.", False
+                else:
+                    pred = p.get("prediction", {})
+                    pred.setdefault("eliminatorias", {})["pichichi"] = new_value
+                    get_storage().update_prediction(pid, pred)
+                    msg, ok = f"Pichichi de '{p['name']}' actualizado a '{new_value}'.", True
+            except Exception as exc:
+                msg, ok = f"Error al corregir pichichi: {exc}", False
+
         elif action == "delete_participant" and authed:
             try:
                 pname = request.form.get("participant_name", "").strip()
