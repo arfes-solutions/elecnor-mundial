@@ -137,6 +137,14 @@ def get_participant_by_email(email):
     }
 
 
+def delete_participant_by_name(name):
+    _check(requests.delete(
+        _url("participants"),
+        headers=_headers(),
+        params={"name": f"ilike.{name.strip()}"},
+    ))
+
+
 def get_participant_by_name(name):
     r = _check(requests.get(
         _url("participants"),

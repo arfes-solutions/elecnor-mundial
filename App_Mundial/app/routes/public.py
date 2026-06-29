@@ -816,12 +816,15 @@ HTML_TEMPLATE = """
                     {% for ronda, label in [('octavos','Octavos de Final'),('cuartos','Cuartos de Final'),('semis','Semifinales'),('final','La Final')] %}
                     {% set equipos_pred = predicciones.get('eliminatorias',{}).get(ronda, []) %}
                     {% set equipos_real = resultados.get(ronda, []) %}
+                    {% set ronda_completa = resultados.get(ronda ~ '_complete', false) %}
                     <div class="col-md-6">
                         <h6 class="bg-success text-white p-2 rounded text-center fw-bold">{{ label }}</h6>
                         <div class="d-flex flex-wrap justify-content-center gap-1">
                             {% for eq in equipos_pred %}
-                                {% if equipos_real %}
-                                    {% set cls = 'pred-ok' if eq in equipos_real else 'pred-fail' %}
+                                {% if eq in equipos_real %}
+                                    {% set cls = 'pred-ok' %}
+                                {% elif ronda_completa %}
+                                    {% set cls = 'pred-fail' %}
                                 {% else %}
                                     {% set cls = 'pred-none' %}
                                 {% endif %}
@@ -1440,7 +1443,7 @@ HTML_TEMPLATE = """
                         <ul class="list-group list-group-flush small mb-3">
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0" style="background:transparent;">🥇 1º puesto<span class="badge rounded-pill fw-bold" style="background:#f6d365;color:#7a5c00;">250 €</span></li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0" style="background:transparent;">🥈 2º puesto<span class="badge rounded-pill fw-bold" style="background:#d0d0d0;color:#444;">100 €</span></li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0" style="background:transparent;">🥉 3º puesto<span class="badge rounded-pill fw-bold" style="background:#e8a87c;color:#6b3a1f;">50 €</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0" style="background:transparent;">🥉 3º puesto<span class="badge rounded-pill fw-bold" style="background:#e8a87c;color:#6b3a1f;">40 €</span></li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0" style="background:transparent;">4º puesto<span class="badge rounded-pill fw-bold bg-secondary">20 €</span></li>
                         </ul>
                         <p class="mb-0 text-muted small" style="font-style:italic;">En caso de empate, la suma de los premios correspondientes se repartirá en partes iguales entre las personas empatadas.</p>
@@ -2045,6 +2048,17 @@ def admin_panel():
             except Exception as exc:
                 msg, ok = f"Error al guardar partido: {exc}", False
 
+        elif action == "delete_participant" and authed:
+            try:
+                pname = request.form.get("participant_name", "").strip()
+                if pname:
+                    get_storage().delete_participant_by_name(pname)
+                    msg, ok = f"Participante '{pname}' eliminado correctamente.", True
+                else:
+                    msg, ok = "Indica el nombre del participante a eliminar.", False
+            except Exception as exc:
+                msg, ok = f"Error al eliminar participante: {exc}", False
+
         elif action == "save_results" and authed:
             try:
                 results = {}
@@ -2135,6 +2149,15 @@ def admin_panel():
       {% else %}
       <span class="text-muted small">Actualiza automáticamente con resultados reales de football-data.org</span>
       {% endif %}
+    </form>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h5 class="fw-bold text-danger mb-3">🗑️ Eliminar Participante</h5>
+    <form method="POST" class="d-flex gap-3 align-items-center flex-wrap" onsubmit="return confirm('¿Seguro que quieres eliminar a este participante y su predicción?');">
+      <input type="hidden" name="action" value="delete_participant">
+      <input type="text" name="participant_name" class="form-control" style="max-width:300px;" placeholder="Nombre exacto del participante" required>
+      <button type="submit" class="btn btn-danger fw-bold">Eliminar</button>
     </form>
   </div>
 
