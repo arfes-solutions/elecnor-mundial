@@ -138,11 +138,15 @@ def get_participant_by_email(email):
 
 
 def delete_participant_by_name(name):
-    _check(requests.delete(
+    r = _check(requests.delete(
         _url("participants"),
         headers=_headers(),
         params={"name": f"ilike.{name.strip()}"},
     ))
+    deleted = r.json()
+    if not deleted:
+        raise RuntimeError(f"No se encontró ningún participante llamado '{name}'.")
+    return deleted
 
 
 def get_participant_by_name(name):
